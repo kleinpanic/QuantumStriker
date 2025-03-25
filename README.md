@@ -1,7 +1,7 @@
 # QuantumStriker
 
 <!-- HIGH_SCORE_BADGE_START -->
-![1st Place :crown:](https://img.shields.io/badge/1st-klein|517517517-gold)
+![1st Place :diamonds:](https://img.shields.io/badge/1st-klein|517517517-gold)
 ![2nd Place :trophy:](https://img.shields.io/badge/2nd-default|7120-silver)
 ![3rd Place :star:](https://img.shields.io/badge/3rd-testuser|1214-orange)
 <!-- HIGH_SCORE_BADGE_END -->
@@ -122,7 +122,7 @@ When you lose, the game prompts you in the window for your username. Your high s
 <!-- TOP_HIGHSCORES_START -->
 | Rank | Username           | Score | Badge |
 |------|--------------------|-------|-------|
-| 1    | klein              | 517517517 | :crown: |
+| 1    | klein              | 517517517 | :diamonds: |
 | 2    | default            | 7120  | :trophy: |
 | 3    | testuser           | 1214  | :star: |
 <!-- TOP_HIGHSCORES_END -->
