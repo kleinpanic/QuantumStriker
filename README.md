@@ -1,9 +1,9 @@
 # QuantumStriker
 
 <!-- HIGH_SCORE_BADGE_START -->
-![1st Place :first_place_medal:](https://img.shields.io/badge/1st-klein|517517517-gold)
-![2nd Place :second_place_medal:](https://img.shields.io/badge/2nd-default|7120-silver)
-![3rd Place :third_place_medal:](https://img.shields.io/badge/3rd-testuser|1214-bronze)
+![1st Place :crown:](https://img.shields.io/badge/1st-klein|517517517-gold)
+![2nd Place :trophy:](https://img.shields.io/badge/2nd-default|7120-silver)
+![3rd Place :star:](https://img.shields.io/badge/3rd-testuser|1214-orange)
 <!-- HIGH_SCORE_BADGE_END -->
 
 QuantumStriker is a high-performance 2D space shooter written in C using SDL2, SDL2_ttf, and SDL2_gfx. In this game, you pilot a futuristic spacecraft through a dynamically generated galactic environment. As your score increases, enemy spawn rates and difficulty scale up to challenge your reflexes and strategy. Your high score is recorded under your chosen username and becomes part of a community leaderboard that is automatically updated.
@@ -120,11 +120,11 @@ QuantumStriker/
 When you lose, the game prompts you in the window for your username. Your high score is saved in `highscore/<username>_highscore.txt`. The top three scores are automatically parsed and inserted into this README between the markers below. The GitHub Actions workflow runs every Monday at 00:00 UTC, so the leaderboard is kept current.
 
 <!-- TOP_HIGHSCORES_START -->
-| Rank | Username           | Score | Trophy |
-|------|--------------------|-------|--------|
-| 1    | klein              | 517517517 | :first_place_medal: |
-| 2    | default            | 7120  | :second_place_medal: |
-| 3    | testuser           | 1214  | :third_place_medal: |
+| Rank | Username           | Score | Badge |
+|------|--------------------|-------|-------|
+| 1    | klein              | 517517517 | :crown: |
+| 2    | default            | 7120  | :trophy: |
+| 3    | testuser           | 1214  | :star: |
 <!-- TOP_HIGHSCORES_END -->
 
 ## How It Works

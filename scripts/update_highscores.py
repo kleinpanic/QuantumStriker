@@ -28,32 +28,29 @@ def get_scores():
     return scores
 
 def generate_markdown_table(top_scores):
-    header = "| Rank | Username           | Score | Trophy |\n"
-    header += "|------|--------------------|-------|--------|\n"
+    header = "| Rank | Username           | Score | Badge |\n"
+    header += "|------|--------------------|-------|-------|\n"
     rows = []
-    # Use GitHub emoji codes for medals.
-    trophies = [":first_place_medal:", ":second_place_medal:", ":third_place_medal:"]
+    badges = [":crown:", ":trophy:", ":star:"]
     for i, (username, score) in enumerate(top_scores):
-        rows.append(f"| {i+1}    | {username:<18} | {score:<5} | {trophies[i]} |")
+        rows.append(f"| {i+1}    | {username:<18} | {score:<5} | {badges[i]} |")
     table = header + "\n".join(rows)
     return table
 
 def generate_badges(top_scores):
-    # Create a badge for each of the top 3 scores on its own line.
+    # Create a badge for each of the top 3 scores, each on its own line.
     badges_lines = []
     labels = ["1st", "2nd", "3rd"]
-    colors = ["gold", "silver", "bronze"]
-    # We'll include GitHub username info in the badge text.
+    colors = ["gold", "silver", "orange"]  # Using "orange" for star as bronze may not be standard.
+    # Use GitHub emoji codes: :crown: for 1st, :trophy: for 2nd, and :star: for 3rd.
+    emojis = [":crown:", ":trophy:", ":star:"]
     for i, (username, score) in enumerate(top_scores):
         if not username:
             username = "n/a"
-        # Build a message of the form "username | score" and URL-encode spaces.
         message = f"{username}|{score}".replace(" ", "%20")
-        # Create a badge URL using Shields.io. 
         badge_url = f"https://img.shields.io/badge/{labels[i]}-{message}-{colors[i]}"
-        # Each badge is on its own line, with a descriptive alt text including a trophy emoji.
-        # Note: The GitHub emoji codes here are literal text; they will render as emoji when processed by GitHub.
-        badges_lines.append(f"![{labels[i]} Place {':first_place_medal:' if i==0 else (':second_place_medal:' if i==1 else ':third_place_medal:')}]({badge_url})")
+        # Each badge on its own line, with the emoji in the alt text.
+        badges_lines.append(f"![{labels[i]} Place {emojis[i]}]({badge_url})")
     return "\n".join(badges_lines)
 
 def update_section_in_file(marker_start, marker_end, new_content):
@@ -78,26 +75,25 @@ def main():
     print("Starting high score update...")
     scores = get_scores()
     if not scores:
-        print("No scores found. Exiting.")
+        print("No scores found.")
         sys.exit(0)
     # Sort descending by score.
     scores.sort(key=lambda x: x[1], reverse=True)
     top_scores = scores[:3]
     
-    # Generate and update markdown table for top scores.
+    # Generate markdown table for top scores.
     table = generate_markdown_table(top_scores)
     update_section_in_file("<!-- TOP_HIGHSCORES_START -->", "<!-- TOP_HIGHSCORES_END -->", table)
     print("Top high scores table updated.")
     
-    # Generate and update badges for top 3, one per line.
+    # Generate badges for top 3, one per line.
     badges = generate_badges(top_scores)
     update_section_in_file("<!-- HIGH_SCORE_BADGE_START -->", "<!-- HIGH_SCORE_BADGE_END -->", badges)
     print("High score badges updated.")
     
-    # If not running in GitHub Actions, provide extra debug output.
+    # If not running in GitHub Actions, provide additional debug output.
     if os.getenv("GITHUB_ACTIONS") is None:
-        print("High score update complete.")
-        print("Please push your changes or submit a pull request to update the repository.")
+        print("High score update complete. Please push your changes or submit a pull request to update the repository.")
     else:
         print("High score update complete (running under GitHub Actions).")
     
