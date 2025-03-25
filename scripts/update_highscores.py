@@ -31,7 +31,7 @@ def generate_markdown_table(top_scores):
     header = "| Rank | Username           | Score | Badge |\n"
     header += "|------|--------------------|-------|-------|\n"
     rows = []
-    badges = [":crown:", ":trophy:", ":star:"]
+    badges = [":diamonds:", ":trophy:", ":star:"]
     for i, (username, score) in enumerate(top_scores):
         rows.append(f"| {i+1}    | {username:<18} | {score:<5} | {badges[i]} |")
     table = header + "\n".join(rows)
@@ -42,8 +42,8 @@ def generate_badges(top_scores):
     badges_lines = []
     labels = ["1st", "2nd", "3rd"]
     colors = ["gold", "silver", "orange"]  # Using "orange" for star as bronze may not be standard.
-    # Use GitHub emoji codes: :crown: for 1st, :trophy: for 2nd, and :star: for 3rd.
-    emojis = [":crown:", ":trophy:", ":star:"]
+    # Use GitHub emoji codes: :diamonds: for 1st, :trophy: for 2nd, and :star: for 3rd.
+    emojis = [":diamonds:", ":trophy:", ":star:"]
     for i, (username, score) in enumerate(top_scores):
         if not username:
             username = "n/a"
