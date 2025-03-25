@@ -1,0 +1,11 @@
+*.bak
+*.old
+*~
+*.orig
+*.tmp
+*.temp
+*.backup
+obj/
+.legacy/
+Q-Striker
+.username
