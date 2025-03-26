@@ -1,9 +1,12 @@
 #include "blockchain.h"
 #include "encryption.h"   // for hash_score function
+#include "debug.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+
+#define HASH_STR_LEN 65  // assuming SHA-256 hex string length (64 + null terminator)
 
 // Helper: Check if a hash (hex string) meets difficulty requirement (leading zeros).
 static int hash_meets_difficulty(const char *hash, int difficulty) {
@@ -27,9 +30,9 @@ void compute_block_hash(const ScoreBlock *block, char *output_hash) {
              block->prev_hash,
              block->nonce);
     // Debug: output the buffer being hashed.
-    printf("[DEBUG][C] compute_block_hash: buffer = \"%s\"\n", buffer);
+    DEBUG_PRINT(2, 2, "compute_block_hash: buffer = \"%s\"", buffer);
     hash_score(buffer, output_hash);
-    printf("[DEBUG][C] compute_block_hash: computed hash = %s\n", output_hash);
+    DEBUG_PRINT(2, 2, "compute_block_hash: computed hash = %s", output_hash);
 }
 
 // Computes valid proof-of-work for the new block.
@@ -40,11 +43,11 @@ static void compute_proof_of_work(ScoreBlock *block, int difficulty) {
     while (1) {
         compute_block_hash(block, hash);
         // Debug: log each nonce and its corresponding hash.
-        printf("[DEBUG][C] Proof-of-Work: nonce = %u, hash = %s\n", block->nonce, hash);
+        DEBUG_PRINT(2, 2, "Proof-of-Work: nonce = %u, hash = %s", block->nonce, hash);
         if (hash_meets_difficulty(hash, difficulty)) {
             strncpy(block->proof_of_work, hash, HASH_STR_LEN - 1);
             block->proof_of_work[HASH_STR_LEN - 1] = '\0';
-            printf("[DEBUG][C] Valid PoW found: nonce = %u, hash = %s\n", block->nonce, hash);
+            DEBUG_PRINT(2, 3, "Valid PoW found: nonce = %u, hash = %s", block->nonce, hash);
             break;
         }
         block->nonce++;
@@ -67,18 +70,13 @@ void add_score_block(ScoreBlock *newBlock, const ScoreBlock *prev, int difficult
     if (newBlock->timestamp == 0)
         newBlock->timestamp = time(NULL);
 
-    printf("[DEBUG][C] add_score_block: Before PoW:\n");
-    printf("   Username: %s\n", newBlock->username);
-    printf("   Score: %d\n", newBlock->score);
-    printf("   Timestamp: %ld\n", newBlock->timestamp);
-    printf("   Prev_hash: %s\n", newBlock->prev_hash);
+    DEBUG_PRINT(2, 2, "add_score_block: Before PoW: Username: %s, Score: %d, Timestamp: %ld, Prev_hash: %s",
+                newBlock->username, newBlock->score, newBlock->timestamp, newBlock->prev_hash);
 
     // Compute proof-of-work; this updates newBlock->nonce and newBlock->proof_of_work.
     compute_proof_of_work(newBlock, difficulty);
 
-    printf("[DEBUG][C] add_score_block: After PoW:\n");
-    printf("   Proof_of_work: %s\n", newBlock->proof_of_work);
-    printf("   Nonce: %u\n", newBlock->nonce);
+    DEBUG_PRINT(2, 2, "add_score_block: After PoW: Proof_of_work: %s, Nonce: %u", newBlock->proof_of_work, newBlock->nonce);
 }
 
 // Verifies the blockchain integrity.
@@ -87,20 +85,19 @@ int verify_blockchain(const ScoreBlock *chain, int count, int difficulty) {
     for (int i = 0; i < count; i++) {
         const ScoreBlock *block = &chain[i];
         compute_block_hash(block, recomputed_hash);
-        printf("[DEBUG][C] verify_blockchain: Block %d:\n", i);
-        printf("   Stored PoW: %s\n", block->proof_of_work);
-        printf("   Recomputed hash: %s\n", recomputed_hash);
+        DEBUG_PRINT(2, 2, "verify_blockchain: Block %d: Stored PoW: %s", i, block->proof_of_work);
+        DEBUG_PRINT(2, 2, "verify_blockchain: Block %d: Recomputed hash: %s", i, recomputed_hash);
         if (strncmp(block->proof_of_work, recomputed_hash, HASH_STR_LEN) != 0) {
-            printf("Block %d: invalid proof-of-work hash.\n", i);
+            DEBUG_PRINT(2, 0, "Block %d: invalid proof-of-work hash.", i);
             return 0;
         }
         if (!hash_meets_difficulty(block->proof_of_work, difficulty)) {
-            printf("Block %d: proof-of-work does not meet difficulty.\n", i);
+            DEBUG_PRINT(2, 0, "Block %d: proof-of-work does not meet difficulty.", i);
             return 0;
         }
         if (i > 0) {
             if (strncmp(block->prev_hash, chain[i-1].proof_of_work, HASH_STR_LEN) != 0) {
-                printf("Block %d: previous hash does not match.\n", i);
+                DEBUG_PRINT(2, 0, "Block %d: previous hash does not match", i);
                 return 0;
             }
         }

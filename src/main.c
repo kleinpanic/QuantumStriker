@@ -2,7 +2,6 @@
 #include "version.h"
 #include "score.h"
 #include "debug.h"
-int g_debug_level = 0; // default: no debug messages
 
 #include <stdio.h>
 #include <string.h>
@@ -12,36 +11,41 @@ int g_debug_level = 0; // default: no debug messages
 #include <sys/types.h>
 
 int main(int argc, char *argv[]) {
-    if (argc > 1) {
-        if (strcmp(argv[1], "--version") == 0) {
+    // Process command-line arguments.
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--version") == 0) {
+            DEBUG_PRINT(2, 3, "Version flag activated.");
+            DEBUG_PRINT(3, 3, "Version flag activated. Version number will be read from version.h file, and status will return 0");
             printf("Nebula Nexus version %s\n", NEBULA_NEXUS_VERSION);
             return 0;
-        } else if (strcmp(argv[1], "--help") == 0) {
-            printf("Usage: %s [--version] [--help] [--debug] [--fullscreen] [--highscores]\n", argv[0]);
+        } else if (strcmp(argv[i], "--help") == 0) {
+            DEBUG_PRINT(2, 3, "Help flag active");
+            printf("Usage: %s [--version] [--help] [--debug <1-3>] [--fullscreen] [--highscores]\n", argv[0]);
             printf("\n");
             printf("  --version    Print the version number\n");
             printf("  --help       Show this help message\n");
-            printf("  --debug      Debug mode (feature to be implemented later)\n");
+            printf("  --debug      Enable debug mode with a level (1-3)\n");
             printf("  --fullscreen Fullscreen mode (feature to be implemented later)\n");
             printf("  --highscores Display a table of all high scores\n");
             return 0;
-        } else if (strcmp(argv[1], "--debug") == 0) {
-            int level = 1; // default debug level if no number is provided
-            // Check if next argument exists and is a number.
+        } else if (strcmp(argv[i], "--debug") == 0) {
+            g_debug_enabled = 1;
             if (i + 1 < argc) {
-                int tmp = atoi(argv[i+1]);
-                if (tmp >= 1 && tmp <= 3) {
-                    level = tmp;
-                    i++; // Skip the number argument
+                int level = atoi(argv[i+1]);
+                if (level >= 1 && level <= 3) {
+                    g_debug_level = level;
                 }
+                i++; // Skip the level parameter.
             }
-            g_debug_level = level;
-            printf("Debug mode enabled. Level: %d\n", g_debug_level);
-        } else if (strcmp(argv[1], "--fullscreen") == 0) {
+            DEBUG_PRINT(1, 3, "Debug mode on.");
+            DEBUG_PRINT(2, 3, "Debug mode enabled with level %d", g_debug_level);
+            DEBUG_PRINT(3, 3, "Debug mode enabled with level %d. Highest debug enabled.", g_debug_level);
+        } else if (strcmp(argv[i], "--fullscreen") == 0) {
+            DEBUG_PRINT(2, 3, "Fullscreen flag active (not implemented)");
             printf("Fullscreen support will be implemented in a future release.\n");
             return 0;
-        } else if (strcmp(argv[1], "--highscores") == 0) {
-            // Open the "highscore" directory and print a table.
+        } else if (strcmp(argv[i], "--highscores") == 0) {
+            DEBUG_PRINT(2, 3, "Highscores flag active");
             DIR *dir = opendir("highscore");
             if (!dir) {
                 printf("No highscore directory found.\n");
@@ -51,17 +55,14 @@ int main(int argc, char *argv[]) {
             printf("| Username             | High Score |\n");
             printf("+----------------------+------------+\n");
             struct dirent *entry;
-            // Increase buffer size to prevent truncation warnings.
             char filepath[512];
             while ((entry = readdir(dir)) != NULL) {
                 if (strstr(entry->d_name, "_highscore.txt") != NULL) {
-                    // Extract username by stripping the suffix.
                     char *suffix = strstr(entry->d_name, "_highscore.txt");
                     size_t len = suffix - entry->d_name;
                     char username[101] = {0};
                     strncpy(username, entry->d_name, len);
                     username[len] = '\0';
-                    // Construct file path using the new buffer size.
                     snprintf(filepath, sizeof(filepath), "highscore/%s", entry->d_name);
                     FILE *file = fopen(filepath, "r");
                     int hs = 0;
@@ -76,7 +77,7 @@ int main(int argc, char *argv[]) {
             closedir(dir);
             return 0;
         } else {
-            printf("Unknown option: %s\nTry '--help' for usage.\n", argv[1]);
+            printf("Unknown option: %s\nTry '--help' for usage.\n", argv[i]);
             return 1;
         }
     }

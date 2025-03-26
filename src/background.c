@@ -1,4 +1,5 @@
 #include "background.h"
+#include "debug.h"
 #include <SDL2/SDL.h>
 #include <stdlib.h>
 #include <time.h>
@@ -24,6 +25,7 @@ static BGObject bgObjects[NUM_BG_OBJECTS];
 static int bgInitialized = 0;
 
 static void init_background_objects() {
+    DEBUG_PRINT(3, 2, "Initializing background objects...");
     srand((unsigned int)time(NULL));
     for (int i = 0; i < NUM_BG_OBJECTS; i++) {
         int r = rand() % 100;
@@ -54,6 +56,7 @@ static void init_background_objects() {
         bgObjects[i].y = -2000 + rand() % 4000;
     }
     bgInitialized = 1;
+    DEBUG_PRINT(3, 3, "Initialized %d background objects", NUM_BG_OBJECTS);
 }
 
 // Helper to draw a filled circle (for planets and enemies)
@@ -70,6 +73,7 @@ static void draw_filled_circle(SDL_Renderer* renderer, int cx, int cy, int radiu
 }
 
 void draw_background(SDL_Renderer* renderer, float cam_x, float cam_y, int screen_width, int screen_height) {
+    DEBUG_PRINT(2, 2, "Drawing background. Camera position: (%.1f, %.1f)", cam_x, cam_y);
     // Fill with a deep-space color.
     SDL_SetRenderDrawColor(renderer, 0, 0, 20, 255);
     SDL_RenderClear(renderer);
@@ -82,22 +86,27 @@ void draw_background(SDL_Renderer* renderer, float cam_x, float cam_y, int scree
     int world_bottom = (int)(cam_y + screen_height);
     
     int start_x = world_left - (world_left % GRID_SPACING);
+    DEBUG_PRINT(3, 2, "Grid: world_left=%d, world_right=%d, start_x=%d", world_left, world_right, start_x);
     for (int x = start_x; x <= world_right; x += GRID_SPACING) {
         int screen_x = x - cam_x;
         SDL_RenderDrawLine(renderer, screen_x, 0, screen_x, screen_height);
     }
     
     int start_y = world_top - (world_top % GRID_SPACING);
+    DEBUG_PRINT(3, 2, "Grid: world_top=%d, world_bottom=%d, start_y=%d", world_top, world_bottom, start_y);
     for (int y = start_y; y <= world_bottom; y += GRID_SPACING) {
         int screen_y = y - cam_y;
         SDL_RenderDrawLine(renderer, 0, screen_y, screen_width, screen_y);
     }
     
     // Initialize background objects if needed.
-    if (!bgInitialized)
+    if (!bgInitialized) {
+        DEBUG_PRINT(3, 2, "Background objects not initialized, initializing now.");
         init_background_objects();
+    }
     
     // Draw background objects.
+    int drawn = 0;
     for (int i = 0; i < NUM_BG_OBJECTS; i++) {
         float objScreenX = bgObjects[i].x - cam_x;
         float objScreenY = bgObjects[i].y - cam_y;
@@ -115,6 +124,8 @@ void draw_background(SDL_Renderer* renderer, float cam_x, float cam_y, int scree
             SDL_Rect rect = { (int)objScreenX, (int)objScreenY, bgObjects[i].size, bgObjects[i].size };
             SDL_RenderFillRect(renderer, &rect);
         }
+        drawn++;
     }
+    DEBUG_PRINT(3, 3, "Background objects drawn: %d", drawn);
 }
 

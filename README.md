@@ -1,10 +1,23 @@
 # QuantumStriker
 
-<!-- HIGH_SCORE_BADGE_START -->
-![1st Place :diamonds:](https://img.shields.io/badge/1st-klein|517517517-gold)
-![2nd Place :trophy:](https://img.shields.io/badge/2nd-default|7120-silver)
-![3rd Place :star:](https://img.shields.io/badge/3rd-testuser|1214-orange)
-<!-- HIGH_SCORE_BADGE_END -->
+## Disclaimer 
+
+> if you want to enjoy this game, and submit your high score, please be aware that it may be lost due to future updates. 
+> if anyone besides myself is to ever play this game and contribute a score, I will try to develop a full proof mechanism to have past blockchain entries 
+> be compliant with future additions. I will save your score, and do my best to make sure it is preserved for future iterations, but I canot make that a 
+> promise. 
+
+## Top Scores & Cheaters 
+
+<!-- TOP_SCORES_START -->
+| Rank | Username           | Score | Timestamp |
+|------|--------------------|-------|-----------|
+| 1    | kleinpanic         | 49    | 2025-03-26 02:24:56 |
+<!-- TOP_SCORES_END -->
+
+<!-- CHEATERS_START -->
+No cheaters found.
+<!-- CHEATERS_END -->
 
 QuantumStriker is a high-performance 2D space shooter written in C using SDL2, SDL2_ttf, and SDL2_gfx. In this game, you pilot a futuristic spacecraft through a dynamically generated galactic environment. As your score increases, enemy spawn rates and difficulty scale up to challenge your reflexes and strategy. When you lose, your score is recorded in a blockchain-based high score system that validates your score using cryptographic proof-of-work and digital signatures. Invalid scores (or those that fail verification) are flagged as cheaters and will be listed in a dedicated cheaters section in the repository README.
 
@@ -155,8 +168,8 @@ QuantumStriker/
   Inserted between markers:
   ```markdown
   <!-- CHEATERS_START -->
-  ... (list of users with invalid scores)
-  <!-- CHEATERS_END -->
+No cheaters found.
+<!-- CHEATERS_END -->
   ```
 
 The GitHub Actions workflow (via `.github/workflows/update-highscores.yml`) runs the `update_highscores.py` script periodically to update these sections.

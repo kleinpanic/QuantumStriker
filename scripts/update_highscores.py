@@ -6,6 +6,23 @@ import json
 import hashlib
 import time
 
+# ANSI color codes for debug messages:
+COLOR_RED = "\033[31m"
+COLOR_GREEN = "\033[32m"
+COLOR_BLUE = "\033[34m"
+COLOR_YELLOW = "\033[33m"
+COLOR_RESET = "\033[0m"
+
+def debug_print(level, message):
+    # level: 1=critical (red), 2=info (blue), 3=success (green)
+    if level == 1:
+        color = COLOR_RED
+    elif level == 3:
+        color = COLOR_GREEN
+    else:
+        color = COLOR_BLUE
+    print(f"{color}[DEBUG] {message}{COLOR_RESET}")
+
 # Configuration
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BLOCKCHAIN_FILE = os.path.join(BASE_DIR, "highscore", "blockchain.txt")
@@ -16,13 +33,11 @@ def hash_score(data):
     return hashlib.sha256(data.encode()).hexdigest()
 
 def compute_block_hash(block):
-    # Build the data string exactly as done in the C code:
     # Format: username|score|timestamp|prev_hash|nonce
     data = f"{block.get('username','')}|{block.get('score',0)}|{int(block.get('timestamp',0))}|{block.get('prev_hash','')}|{block.get('nonce',0)}"
     computed = hash_score(data)
-    # Debug info
-    print(f"[DEBUG][Py] Data string: '{data}'")
-    print(f"[DEBUG][Py] Computed hash: '{computed}'")
+    debug_print(2, f"Data string: '{data}'")
+    debug_print(2, f"Computed hash: '{computed}'")
     return computed
 
 def verify_proof_of_work(block):
@@ -37,11 +52,11 @@ def verify_proof_of_work(block):
     return True
 
 def verify_signature(block):
-    # Stub: Here we assume the signature is valid if it exists and its length is above a threshold.
     sig = block.get("signature", "")
     if not sig or len(sig) < 10:
         print(f"Invalid signature for block: {block}")
         return False
+    debug_print(2, f"Signature present (length {len(sig)}) for user '{block.get('username','')}'")
     return True
 
 def load_blockchain():
@@ -59,7 +74,7 @@ def load_blockchain():
                 blocks.append(block)
             except Exception as e:
                 print(f"Error parsing block: {e}")
-    print(f"[DEBUG][Py] Loaded {len(blocks)} block(s) from {BLOCKCHAIN_FILE}")
+    debug_print(2, f"Loaded {len(blocks)} block(s) from {BLOCKCHAIN_FILE}")
     return blocks
 
 def partition_blocks(blocks):
@@ -75,7 +90,7 @@ def partition_blocks(blocks):
 def get_top_scores(blocks):
     """
     Build a dictionary mapping each username to their highest valid score.
-    Returns a list of tuples: (username, score, block), sorted descending by score.
+    Returns a sorted list of tuples: (username, score, block) in descending order.
     """
     top_scores = {}
     for block in blocks:
@@ -87,11 +102,13 @@ def get_top_scores(blocks):
     result.sort(key=lambda x: x[1], reverse=True)
     return result
 
-def generate_markdown_table(top_scores):
+def generate_markdown_table(top_scores, limit=3):
     header = "| Rank | Username           | Score | Timestamp |\n"
     header += "|------|--------------------|-------|-----------|\n"
     rows = []
-    for i, (username, score, block) in enumerate(top_scores[:3]):
+    display_limit = len(top_scores) if len(top_scores) < limit else limit
+    for i in range(display_limit):
+        username, score, block = top_scores[i]
         ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(block.get('timestamp',0)))
         rows.append(f"| {i+1}    | {username:<18} | {score:<5} | {ts} |")
     table = header + "\n".join(rows)
@@ -107,7 +124,6 @@ def generate_cheaters_table(cheater_blocks):
         username = block.get("username", "")
         score = block.get("score", 0)
         ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(block.get("timestamp",0)))
-        # Determine reason(s) for failure
         reasons = []
         if not verify_proof_of_work(block):
             reasons.append("Invalid PoW")
@@ -124,9 +140,7 @@ def update_section_in_file(marker_start, marker_end, new_content):
         sys.exit(1)
     with open(README_PATH, "r") as f:
         content = f.read()
-    pattern = re.compile(
-        rf"({re.escape(marker_start)})(.*?){re.escape(marker_end)}", re.DOTALL
-    )
+    pattern = re.compile(rf"({re.escape(marker_start)})(.*?){re.escape(marker_end)}", re.DOTALL)
     updated_section = f"{marker_start}\n{new_content}\n{marker_end}"
     new_file_content, count = pattern.subn(updated_section, content)
     if count == 0:
@@ -144,14 +158,14 @@ def main():
         sys.exit(0)
     
     valid_blocks, cheater_blocks = partition_blocks(all_blocks)
-    print(f"[DEBUG][Py] Valid blocks: {len(valid_blocks)}, Cheater blocks: {len(cheater_blocks)}")
+    debug_print(2, f"Valid blocks: {len(valid_blocks)}, Cheater blocks: {len(cheater_blocks)}")
     
     top_scores = get_top_scores(valid_blocks)
     if not top_scores:
         print("No top scores found.")
         sys.exit(0)
     
-    table = generate_markdown_table(top_scores)
+    table = generate_markdown_table(top_scores, limit=3)
     update_section_in_file("<!-- TOP_SCORES_START -->", "<!-- TOP_SCORES_END -->", table)
     print("Top high scores table updated.")
     
@@ -159,8 +173,9 @@ def main():
     update_section_in_file("<!-- CHEATERS_START -->", "<!-- CHEATERS_END -->", cheaters_table)
     print("Cheaters table updated.")
     
+    # Inform the user if running locally (manual push needed) or automatically (CI)
     if os.getenv("GITHUB_ACTIONS") is None:
-        print("High score update complete. Please push your changes to update the repository.")
+        print("High score update complete. This script is intended to run regularly. Please manually push your changes to update the repository.")
     else:
         print("High score update complete (running under GitHub Actions).")
 

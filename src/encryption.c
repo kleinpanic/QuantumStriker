@@ -1,4 +1,5 @@
 #include "encryption.h"
+#include "debug.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,7 +28,7 @@ void hash_score(const char *data, char *output_hash) {
 static int write_private_key_to_username(const char *username, EVP_PKEY *pkey) {
     FILE *fp = fopen(USERNAME_FILE, "w");
     if (!fp) {
-        fprintf(stderr, "Error opening %s for writing: %s\n", USERNAME_FILE, strerror(errno));
+        DEBUG_PRINT(1, 0, "Error opening %s for writing: %s", USERNAME_FILE, strerror(errno));
         return 0;
     }
     // Write the username on the first line.
@@ -39,7 +40,7 @@ static int write_private_key_to_username(const char *username, EVP_PKEY *pkey) {
         return 0;
     }
     if (!PEM_write_bio_PrivateKey(bio, pkey, NULL, NULL, 0, NULL, NULL)) {
-        fprintf(stderr, "Error writing private key to memory BIO\n");
+        DEBUG_PRINT(1, 0, "Error writing private key to memory BIO");
         BIO_free(bio);
         fclose(fp);
         return 0;
@@ -64,13 +65,13 @@ static int write_public_key(const char *username, EVP_PKEY *pkey) {
     struct stat st;
     if (stat("highscore", &st) != 0) {
         if (mkdir("highscore", 0755) != 0) {
-            fprintf(stderr, "Error creating highscore directory: %s\n", strerror(errno));
+            DEBUG_PRINT(1, 0, "Error creating highscore directory: %s", strerror(errno));
             return 0;
         }
     }
     if (stat(pub_dir, &st) != 0) {
         if (mkdir(pub_dir, 0755) != 0) {
-            fprintf(stderr, "Error creating public keys directory %s: %s\n", pub_dir, strerror(errno));
+            DEBUG_PRINT(1, 0, "Error Creating public keys directory %s: %s", pub_dir, strerror(errno));
             return 0;
         }
     }
@@ -78,11 +79,11 @@ static int write_public_key(const char *username, EVP_PKEY *pkey) {
     snprintf(pub_filename, sizeof(pub_filename), "%s/%s_public.pem", pub_dir, username);
     FILE *fp = fopen(pub_filename, "wb");
     if (!fp) {
-        fprintf(stderr, "Error opening %s for writing: %s\n", pub_filename, strerror(errno));
+        DEBUG_PRINT(1, 0, "Error opening %s for writing: %s", pub_filename, strerror(errno));
         return 0;
     }
     if (!PEM_write_PUBKEY(fp, pkey)) {
-        fprintf(stderr, "Error writing public key for user %s\n", username);
+        DEBUG_PRINT(1, 0, "Error Writing public key for user %s", username);
         fclose(fp);
         return 0;
     }
@@ -97,32 +98,32 @@ int generate_keypair(const char *username) {
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
     if (!ctx) {
-        fprintf(stderr, "Error creating EVP_PKEY_CTX for user %s\n", username);
+        DEBUG_PRINT(2, 0, "Error creating EVP_PKEY_CTX for user %s", username);
         return 0;
     }
     if (EVP_PKEY_keygen_init(ctx) <= 0) {
-        fprintf(stderr, "Error initializing key generation for user %s\n", username);
+        DEBUG_PRINT(2, 0, "Error initializing key generation for user %s", username);
         goto cleanup;
     }
     if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) <= 0) {
-        fprintf(stderr, "Error setting RSA key size for user %s\n", username);
+        DEBUG_PRINT(2, 0, "Error setting RSA key size for user %s", username);
         goto cleanup;
     }
     if (EVP_PKEY_keygen(ctx, &pkey) <= 0) {
-        fprintf(stderr, "Error during key generation for user %s\n", username);
+        DEBUG_PRINT(2, 0, "Error during key generation for user %s", username);
         goto cleanup;
     }
     
     if (!write_private_key_to_username(username, pkey)) {
-        fprintf(stderr, "Error saving private key for user %s in %s\n", username, USERNAME_FILE);
+        DEBUG_PRINT(2, 0, "Error saving private key for user %s in %s", username, USERNAME_FILE);
         goto cleanup;
     }
     if (!write_public_key(username, pkey)) {
-        fprintf(stderr, "Error saving public key for user %s\n", username);
+        DEBUG_PRINT(2, 0, "Error saving public key for user %s", username);
         goto cleanup;
     }
     
-    fprintf(stderr, "Key pair generated for user %s\n", username);
+    DEBUG_PRINT(2, 3, "Key pair generated for user %s", username);
     ret = 1; // success
 
 cleanup:
@@ -136,12 +137,12 @@ cleanup:
 void* load_private_key(const char *username) {
     // Ensure a valid key pair exists.
     if (!ensure_keypair(username)) {
-        fprintf(stderr, "Failed to ensure key pair for %s\n", username);
+        DEBUG_PRINT(2, 0, "Failed to ensure key pair for %s", username);
         return NULL;
     }
     FILE *fp = fopen(USERNAME_FILE, "r");
     if (!fp) {
-        fprintf(stderr, "Could not open %s for reading private key for user %s\n", USERNAME_FILE, username);
+        DEBUG_PRINT(2, 0, "Could not open %s for reading private key for user %s", USERNAME_FILE, username);
         return NULL;
     }
     char buffer[256];
@@ -165,7 +166,7 @@ void* load_private_key(const char *username) {
     // Look for the PEM header.
     char *pem_start = strstr(file_contents, "-----BEGIN");
     if (!pem_start) {
-        fprintf(stderr, "Private key PEM block not found in %s\n", USERNAME_FILE);
+        DEBUG_PRINT(2, 0, "Private key PEM block not found in %s", USERNAME_FILE);
         free(file_contents);
         // If no PEM block, regenerate keys.
         if (generate_keypair(username)) {
@@ -180,7 +181,7 @@ void* load_private_key(const char *username) {
     }
     EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
     if (!pkey) {
-        fprintf(stderr, "Error reading private key from memory buffer for user %s\n", username);
+        DEBUG_PRINT(2, 0, "Error reading private key from memory buffer for user %s", username);
     }
     BIO_free(bio);
     free(file_contents);
@@ -193,13 +194,13 @@ void* load_public_key(const char *username) {
     snprintf(pub_filename, sizeof(pub_filename), "highscore/public_keys/%s_public.pem", username);
     FILE *fp = fopen(pub_filename, "rb");
     if (!fp) {
-        fprintf(stderr, "Public key file %s not found for user %s\n", pub_filename, username);
+        DEBUG_PRINT(2, 0, "Public key file %s not found for user %s", pub_filename, username);
         return NULL;
     }
     EVP_PKEY *pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
     fclose(fp);
     if (!pkey) {
-        fprintf(stderr, "Error loading public key from %s for user %s\n", pub_filename, username);
+        DEBUG_PRINT(2, 0, "Error loading public key from %s for user %s", pub_filename, username);
     }
     return pkey;
 }
@@ -209,7 +210,7 @@ void* load_public_key(const char *username) {
 int ensure_keypair(const char *username) {
     FILE *fp = fopen(USERNAME_FILE, "r");
     if (!fp) {
-        fprintf(stderr, "Private key file %s not found; generating new key pair for %s.\n", USERNAME_FILE, username);
+        DEBUG_PRINT(2, 1, "Private key file %s not found; generating new key pair for %s.", USERNAME_FILE, username);
         return generate_keypair(username);
     }
     char line[256];
@@ -222,10 +223,9 @@ int ensure_keypair(const char *username) {
     }
     fclose(fp);
     if (!found) {
-        fprintf(stderr, "No private key PEM block found in %s; generating new key pair for %s.\n", USERNAME_FILE, username);
+        DEBUG_PRINT(2, 1, "No private key PEM block found in %s; generating new key pair for %s.", USERNAME_FILE, username);
         return generate_keypair(username);
     }
-    fprintf(stderr, "Private key exists for user %s in %s.\n", username, USERNAME_FILE);
+    DEBUG_PRINT(2, 3, "Private key exists for user %s in %s.", username, USERNAME_FILE);
     return 1;
 }
-

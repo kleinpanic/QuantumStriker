@@ -7,6 +7,7 @@
 #include "blockchain.h"
 #include "signature.h"
 #include "encryption.h"
+#include "debug.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -29,7 +30,8 @@ int get_user_top_score(const char *username, ScoreBlock *topBlock);
 // Helper function to render text using SDL_ttf.
 void render_text(SDL_Renderer* renderer, TTF_Font* font, int x, int y, const char* text, SDL_Color color) {
     SDL_Surface* surface = TTF_RenderText_Blended(font, text, color);
-    if (!surface) return;
+    if (!surface)
+        return;
     SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_Rect dst = { x, y, surface->w, surface->h };
     SDL_RenderCopy(renderer, texture, NULL, &dst);
@@ -78,6 +80,7 @@ char* prompt_username(SDL_Renderer* renderer, TTF_Font* font, int screen_width, 
     }
     
     SDL_StopTextInput();
+    DEBUG_PRINT(3, 2, "Username entered: %s", input);
     return strdup(input);
 }
 
@@ -86,23 +89,20 @@ char* prompt_username(SDL_Renderer* renderer, TTF_Font* font, int screen_width, 
 int get_user_top_score(const char *username, ScoreBlock *topBlock) {
     FILE *fp = fopen(BLOCKCHAIN_FILE, "r");
     if (!fp) {
+        DEBUG_PRINT(2, 1, "Blockchain file not found: %s", BLOCKCHAIN_FILE);
         return -1;
     }
     char line[2048];
     int topScore = -1;
     ScoreBlock temp;
-    // Use a temporary buffer for the prev_hash field that can hold up to 128 characters.
-    char prev_hash_buf[129] = {0}; // 128 characters + null terminator
-
+    char prev_hash_buf[129] = {0};  // Buffer for prev_hash (128 chars + null)
     while (fgets(line, sizeof(line), fp)) {
         int ret = sscanf(line,
-            "{\"username\":\"%49[^\"]\", \"score\":%d, \"timestamp\":%ld, \"proof_of_work\":\"%64[^\"]\", \"signature\":\"%256[^\"]\", \"prev_hash\":\"%128[^\"]\", \"nonce\":%u}",
+            "{\"username\":\"%49[^\"]\", \"score\":%d, \"timestamp\":%ld, \"proof_of_work\":\"%64[^\"]\", \"signature\":\"%512[^\"]\", \"prev_hash\":\"%128[^\"]\", \"nonce\":%u}",
             temp.username, &temp.score, &temp.timestamp, temp.proof_of_work, temp.signature, prev_hash_buf, &temp.nonce);
         if (ret == 7 && strcmp(temp.username, username) == 0) {
-            // Normalize the prev_hash value by truncating to 64 characters.
             prev_hash_buf[64] = '\0';
             strcpy(temp.prev_hash, prev_hash_buf);
-            // Validate the digital signature.
             if (verify_score_signature(&temp, username, temp.signature)) {
                 if (temp.score > topScore) {
                     topScore = temp.score;
@@ -111,28 +111,29 @@ int get_user_top_score(const char *username, ScoreBlock *topBlock) {
                     }
                 }
             } else {
-                fprintf(stderr, "Invalid signature for user %s in blockchain record.\n", username);
+                DEBUG_PRINT(2, 0, "Invalid signature for user %s in blockchain record", username);
             }
         }
     }
     fclose(fp);
+    DEBUG_PRINT(2, 2, "Top score for user %s: %d", username, topScore);
     return topScore;
 }
 
 void game_loop() {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        SDL_Log("SDL_Init Error: %s", SDL_GetError());
+        DEBUG_PRINT(1, 0, "SDL_Init Error: %s", SDL_GetError());
         return;
     }
     if (TTF_Init() != 0) {
-        SDL_Log("TTF_Init Error: %s", TTF_GetError());
+        DEBUG_PRINT(1, 0, "TTF_Init Error: %s", TTF_GetError());
         SDL_Quit();
         return;
     }
     
     SDL_Window* win = SDL_CreateWindow("QuantumStriker", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);
     if (!win) {
-        SDL_Log("SDL_CreateWindow Error: %s", SDL_GetError());
+        DEBUG_PRINT(1, 0, "SDL_CreateWindow Error: %s", SDL_GetError());
         TTF_Quit();
         SDL_Quit();
         return;
@@ -140,7 +141,7 @@ void game_loop() {
     
     SDL_Renderer* renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) {
-        SDL_Log("SDL_CreateRenderer Error: %s", SDL_GetError());
+        DEBUG_PRINT(1, 0, "SDL_CreateRenderer Error: %s", SDL_GetError());
         SDL_DestroyWindow(win);
         TTF_Quit();
         SDL_Quit();
@@ -149,7 +150,7 @@ void game_loop() {
     
     TTF_Font* font = TTF_OpenFont("src/Arial.ttf", 16);
     if (!font) {
-        SDL_Log("TTF_OpenFont Error: %s", TTF_GetError());
+        DEBUG_PRINT(1, 0, "TTF_OpenFont Error: %s", TTF_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(win);
         TTF_Quit();
@@ -170,11 +171,10 @@ void game_loop() {
         save_username(username);
     }
     if (!ensure_keypair(username)) {
-        fprintf(stderr, "Key pair generation failed for user %s\n", username);
+        DEBUG_PRINT(2, 0, "Key pair generation failed for user %s", username);
         // Optionally exit if keypair generation is critical.
     }
-    printf("[DEBUG][C] Starting game with username: %s\n", username);
-    /* -------------------------------------------------------------------------- */
+    DEBUG_PRINT(2, 3, "Starting game with username: %s", username);
 
     // Now initialize game objects.
     Player player;
@@ -198,7 +198,9 @@ void game_loop() {
     struct stat st = {0};
     if (stat("highscore", &st) == -1) {
         if (mkdir("highscore", 0755) == -1) {
-            fprintf(stderr, "Error creating highscore directory: %s\n", strerror(errno));
+            DEBUG_PRINT(2, 0, "Error creating highscore directory: %s", strerror(errno));
+        } else {
+            DEBUG_PRINT(2, 3, "Highscore directory created");
         }
     }
     
@@ -238,8 +240,10 @@ void game_loop() {
             if (e.type == SDL_QUIT)
                 running = 0;
             else if (e.type == SDL_KEYDOWN &&
-                     (e.key.keysym.sym == SDLK_ESCAPE || e.key.keysym.sym == SDLK_q))
-                running = 0;
+                     (e.key.keysym.sym == SDLK_ESCAPE || e.key.keysym.sym == SDLK_q)) {
+                player.health = 0;
+                DEBUG_PRINT(2, 0, "Q or Escape pressed. Game ended");
+            }
         }
         
         update_player(&player);
@@ -257,6 +261,7 @@ void game_loop() {
         if (spawnTimer > spawnIntervalFrames) {
             spawn_enemy(enemies, player.x, player.y, 1.0f);
             spawnTimer = 0;
+            DEBUG_PRINT(3, 2, "Enemy spawned; spawnTimer reset");
         }
         
         float diffScale = 1.0f + ((score > 5000 ? 5000 : score) / 1000.0f);
@@ -273,9 +278,11 @@ void game_loop() {
                         if (dist < 15) {
                             enemies[j].health -= 1;
                             bulletPool.bullets[i].active = 0;
+                            DEBUG_PRINT(3, 2, "Bullet collision: enemy %d hit; new health = %d", j, enemies[j].health);
                             if (enemies[j].health <= 0) {
                                 enemies[j].active = 0;
                                 enemiesKilled++;
+                                DEBUG_PRINT(3, 3, "Enemy %d destroyed; total enemies killed = %d", j, enemiesKilled);
                             }
                         }
                     }
@@ -290,8 +297,10 @@ void game_loop() {
                 float dy = player.y - enemies[j].y;
                 float dist = sqrtf(dx * dx + dy * dy);
                 if (dist < 20) {
-                    if (!player.shieldActive)
+                    if (!player.shieldActive) {
                         player.health -= 1;
+                        DEBUG_PRINT(3, 0, "Player hit by enemy %d; health reduced to %d", j, player.health);
+                    }
                     enemies[j].active = 0;
                 }
             }
@@ -301,31 +310,32 @@ void game_loop() {
         score = (int)(now - startTime) + (enemiesKilled * 10);
         
         if (player.health <= 0) {
-            // Game over: use the stored username.
-            printf("[DEBUG][C] Game over. Using username: %s\n", username);
+            DEBUG_PRINT(2, 2, "Game over. Using username: %s", username);
             
             // Get the previous block (if any) for proper chain linkage.
-            ScoreBlock topBlock = {0};
-            int prevScore = get_user_top_score(username, &topBlock);
+            ScoreBlock lastBlock = {0};
+            int exists = get_last_block_for_user(username, &lastBlock);
             ScoreBlock newBlock = {0};
             strncpy(newBlock.username, username, sizeof(newBlock.username)-1);
             newBlock.score = score;
             newBlock.timestamp = now;
-            if (prevScore < 0) {
+            if (!exists) {
                 // No previous block exists – genesis block.
                 memset(newBlock.prev_hash, '0', HASH_STR_LEN - 1);
                 newBlock.prev_hash[HASH_STR_LEN - 1] = '\0';
                 add_score_block(&newBlock, NULL, DIFFICULTY);
+                DEBUG_PRINT(2, 3, "Genesis block created for user %s", username);
             } else {
                 // Use the previous block’s proof-of-work for chain linkage.
-                strncpy(newBlock.prev_hash, topBlock.proof_of_work, HASH_STR_LEN);
+                strncpy(newBlock.prev_hash, lastBlock.proof_of_work, HASH_STR_LEN);
                 newBlock.prev_hash[HASH_STR_LEN - 1] = '\0';
-                add_score_block(&newBlock, &topBlock, DIFFICULTY);
+                add_score_block(&newBlock, &lastBlock, DIFFICULTY);
+                DEBUG_PRINT(2, 3, "New block chained to last block for user %s", username);
             }
             
             // Sign the block.
             if (!sign_score(&newBlock, username, newBlock.signature)) {
-                fprintf(stderr, "Failed to sign score block for user %s.\n", username);
+                DEBUG_PRINT(2, 0, "Failed to sign score block for user %s", username);
             } else {
                 // Append the new block in JSON format.
                 FILE *fp = fopen(BLOCKCHAIN_FILE, "a");
@@ -335,8 +345,9 @@ void game_loop() {
                         newBlock.username, newBlock.score, newBlock.timestamp,
                         newBlock.proof_of_work, newBlock.signature, newBlock.prev_hash, newBlock.nonce);
                     fclose(fp);
+                    DEBUG_PRINT(2, 3, "Score block appended for user %s", username);
                 } else {
-                    fprintf(stderr, "Failed to open blockchain file for appending.\n");
+                    DEBUG_PRINT(2, 0, "Failed to open blockchain file for appending");
                 }
             }
             
@@ -363,10 +374,10 @@ void game_loop() {
         float cam_y = player.y - screen_height/2;
         
         draw_background(renderer, cam_x, cam_y, screen_width, screen_height);
+        SDL_Color white = {255, 255, 255, 255};
         char hud[200];
         sprintf(hud, "Health: %d  Energy: %.1f  Score: %d  X: %.1f  Y: %.1f  Angle: %.1f", 
                 player.health, player.energy, score, player.x, player.y, player.angle);
-        SDL_Color white = {255, 255, 255, 255};
         render_text(renderer, font, 10, 10, hud, white);
         draw_bullets(&bulletPool, renderer, cam_x, cam_y);
         draw_enemies(enemies, renderer, cam_x, cam_y);

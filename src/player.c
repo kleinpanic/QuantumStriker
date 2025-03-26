@@ -1,4 +1,5 @@
 #include "player.h"
+#include "debug.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
 #include <math.h>
@@ -26,18 +27,23 @@ void init_player(Player *player, int screen_width, int screen_height) {
     player->health = 5;
     player->energy = MAX_ENERGY;
     player->shieldActive = 0;
+    DEBUG_PRINT(2, 3, "Player initialized: pos=(%.2f, %.2f), angle=%.2f, health=%d, energy=%.2f",
+                player->x, player->y, player->angle, player->health, player->energy);
 }
 
 void rotate_player(Player *player, float angle_delta) {
     player->angle += angle_delta;
     if (player->angle < 0) player->angle += 360;
     if (player->angle >= 360) player->angle -= 360;
+    DEBUG_PRINT(3, 2, "Player rotated: new angle=%.2f", player->angle);
 }
 
 static void apply_thrust(Player *player, float offset_angle) {
     float rad = (player->angle - 90 + offset_angle) * (M_PI / 180.0f);
     player->vx += sinf(rad) * THRUST_ACCELERATION;
     player->vy -= cosf(rad) * THRUST_ACCELERATION;
+    DEBUG_PRINT(3, 2, "Applied thrust: offset=%.2f, new velocity=(%.2f, %.2f)",
+                offset_angle, player->vx, player->vy);
 }
 
 void thrust_player(Player *player) {
@@ -64,9 +70,12 @@ void update_player(Player *player) {
         float scale = MAX_SPEED / speed;
         player->vx *= scale;
         player->vy *= scale;
+        DEBUG_PRINT(3, 2, "Speed capped: new velocity=(%.2f, %.2f)", player->vx, player->vy);
     }
     player->vx *= DAMPING;
     player->vy *= DAMPING;
+    DEBUG_PRINT(3, 2, "Player updated: pos=(%.2f, %.2f), velocity=(%.2f, %.2f)",
+                player->x, player->y, player->vx, player->vy);
 }
 
 void update_shield_energy(Player *player) {
@@ -75,6 +84,7 @@ void update_shield_energy(Player *player) {
         if (player->energy < 0) {
             player->energy = 0;
             player->shieldActive = 0;
+            DEBUG_PRINT(3, 0, "Shield deactivated due to energy depletion");
         }
     } else {
         if (player->energy < MAX_ENERGY) {
@@ -82,6 +92,8 @@ void update_shield_energy(Player *player) {
             if (player->energy > MAX_ENERGY) player->energy = MAX_ENERGY;
         }
     }
+    DEBUG_PRINT(3, 2, "Shield energy updated: energy=%.2f, shieldActive=%d",
+                player->energy, player->shieldActive);
 }
 
 void activate_shield(Player *player, int active) {
@@ -89,6 +101,7 @@ void activate_shield(Player *player, int active) {
         player->shieldActive = 1;
     else
         player->shieldActive = 0;
+    DEBUG_PRINT(3, 2, "Shield activation set to %d", player->shieldActive);
 }
 
 // Draw the player as an arrow with five points.
@@ -127,6 +140,7 @@ void draw_player(Player *player, SDL_Renderer* renderer, int screen_x, int scree
                       screen_x + (int)size + 5, screen_y + (int)size + 5,
                       0, 200, 255, 255);
     }
+    DEBUG_PRINT(3, 2, "Player drawn at screen position (%d, %d)", screen_x, screen_y);
 }
 
 // Compute the tip of the ship (spawn point for bullets).
@@ -138,4 +152,6 @@ void get_ship_tip(const Player *player, float *tip_x, float *tip_y) {
     float ty = -size * cosf(angleRad);
     *tip_x = player->x + tx;
     *tip_y = player->y + ty;
+    DEBUG_PRINT(3, 2, "Ship tip computed: (%.2f, %.2f)", *tip_x, *tip_y);
 }
+

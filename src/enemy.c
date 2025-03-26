@@ -1,4 +1,5 @@
 #include "enemy.h"
+#include "debug.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
 #include <stdlib.h>
@@ -12,6 +13,7 @@ void init_enemies(Enemy enemies[]) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         enemies[i].active = 0;
     }
+    DEBUG_PRINT(2, 3, "Enemies initialized: %d enemies set inactive", MAX_ENEMIES);
 }
 
 void update_enemies(Enemy enemies[], float player_x, float player_y, float difficulty) {
@@ -23,18 +25,22 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
                 enemies[i].x += (diff_x > 0 ? 0.5f : -0.5f) * difficulty;
             if (fabs(diff_y) > 2.0f)
                 enemies[i].y += (diff_y > 0 ? 0.3f : -0.3f) * difficulty;
+            DEBUG_PRINT(3, 2, "Updated enemy %d: new position = (%.2f, %.2f)", i, enemies[i].x, enemies[i].y);
         }
     }
 }
 
 void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float cam_y) {
+    int drawn = 0;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (enemies[i].active) {
             int cx = (int)(enemies[i].x - cam_x);
             int cy = (int)(enemies[i].y - cam_y);
             filledEllipseRGBA(renderer, cx, cy, 15, 10, 255, 0, 0, 255);
+            drawn++;
         }
     }
+    DEBUG_PRINT(3, 2, "Drawn %d active enemies", drawn);
 }
 
 void spawn_enemy(Enemy enemies[], float player_x, float player_y, float spawnRateModifier) {
@@ -48,7 +54,9 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, float spawnRat
             enemies[i].health = (int)(3 * spawnRateModifier);
             enemies[i].type = 1;
             enemies[i].active = 1;
+            DEBUG_PRINT(3, 3, "Spawned enemy at (%.2f, %.2f) with health %d", enemies[i].x, enemies[i].y, enemies[i].health);
             break;
         }
     }
 }
+
