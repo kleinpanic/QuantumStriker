@@ -12,7 +12,7 @@
 <!-- TOP_SCORES_START -->
 | Rank | Username           | Score | Timestamp |
 |------|--------------------|-------|-----------|
-| 1    | kleinpanic         | 49    | 2025-03-26 02:24:56 |
+| 1    | kleinpanic         | 49    | 2025-03-26 06:24:56 |
 <!-- TOP_SCORES_END -->
 
 <!-- CHEATERS_START -->
