@@ -2,7 +2,11 @@
 
 ## High Score Authentication & Leaderboards
 
-- [ ] Replace plaintext high score files with PGP-signed or otherwise tamper-resistant storage to ensure scores are achieved authentically.
+- [X] Replace plaintext high score files with PGP-signed or otherwise tamper-resistant storage to ensure scores are achieved authentically.
+- [X] Add encryption algorithms and block-chain technology as well as pgp digital signatures to ensure authenticity.
+- [ ] Encorporate game settings as part of the encryption, and block-chain technology to ensure that game settings can be reproduced if the user manually changes them.
+- [ ] Detere more advanced cheating by trying to create a distributed blockchain, and network-wide consensus to prevent tampering, enhance the PoW slightly (but not to an extent to use too much CPU resources). Current implementation deteres causal score manipulation (requires correct signature and valid PoW, but not immune to file modifications.) 
+    - Truly, 100% prevention of cheating is impossible, and there are limitations with open-sourc, and cheating-prevention.  
 - [ ] Explore implementing online leaderboards for global competition.
 
 ## Start Menu & Additional UI Features
@@ -69,6 +73,7 @@
 - [ ] Implement sound effects and background music.
 - [ ] Explore multiplayer or cooperative modes.
 - [ ] Add a `--debug` flag that, when enabled, displays additional debug information (to be implemented).
+- [ ] Add a `--log` flag that, when enabled, logs all of the debug info instead of shows it
 - [ ] Add a `--fullscreen` flag to launch the game in fullscreen mode (to be implemented).
 - [ ] Add a `--highscores` flag to display a table of all high scores.
 - [ ] Support command-line flags such as `--version` and `--help` for better usability.

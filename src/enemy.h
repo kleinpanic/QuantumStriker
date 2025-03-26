@@ -4,6 +4,7 @@
 #define MAX_ENEMIES 100
 
 #include <SDL2/SDL.h>
+#include "debug.h"
 
 typedef struct {
     float x, y;

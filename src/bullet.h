@@ -2,6 +2,7 @@
 #define BULLET_H
 
 #include <SDL2/SDL.h>
+#include "debug.h"
 
 typedef struct {
     float x, y;

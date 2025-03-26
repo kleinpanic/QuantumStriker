@@ -9,7 +9,7 @@
 
 #define THRUST_ACCELERATION 0.5f
 #define DAMPING 0.99f
-#define MAX_SPEED 15.0f
+#define MAX_SPEED 10.0f
 
 #define MAX_ENERGY 10.0f
 #define DEPLETION_RATE 0.02f

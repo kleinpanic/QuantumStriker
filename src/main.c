@@ -1,6 +1,8 @@
 #include "game.h"
 #include "version.h"
 #include "score.h"
+#include "debug.h"
+int g_debug_level = 0; // default: no debug messages
 
 #include <stdio.h>
 #include <string.h>
@@ -24,8 +26,17 @@ int main(int argc, char *argv[]) {
             printf("  --highscores Display a table of all high scores\n");
             return 0;
         } else if (strcmp(argv[1], "--debug") == 0) {
-            printf("Debug mode will be implemented in a future release.\n");
-            return 0;
+            int level = 1; // default debug level if no number is provided
+            // Check if next argument exists and is a number.
+            if (i + 1 < argc) {
+                int tmp = atoi(argv[i+1]);
+                if (tmp >= 1 && tmp <= 3) {
+                    level = tmp;
+                    i++; // Skip the number argument
+                }
+            }
+            g_debug_level = level;
+            printf("Debug mode enabled. Level: %d\n", g_debug_level);
         } else if (strcmp(argv[1], "--fullscreen") == 0) {
             printf("Fullscreen support will be implemented in a future release.\n");
             return 0;

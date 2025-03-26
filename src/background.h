@@ -2,6 +2,7 @@
 #define BACKGROUND_H
 
 #include <SDL2/SDL.h>
+#include "debug.h"
 
 void draw_background(SDL_Renderer* renderer, float cam_x, float cam_y, int screen_width, int screen_height);
 

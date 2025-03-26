@@ -4,6 +4,9 @@
 #include "bullet.h"
 #include "background.h"
 #include "score.h"
+#include "blockchain.h"
+#include "signature.h"
+#include "encryption.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -14,8 +17,14 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <errno.h>
 
 #define FRAME_DELAY 15   // milliseconds per frame
+#define BLOCKCHAIN_FILE "highscore/blockchain.txt"
+#define DIFFICULTY 4     // PoW difficulty: number of leading zeros required
+
+// Forward declaration.
+int get_user_top_score(const char *username, ScoreBlock *topBlock);
 
 // Helper function to render text using SDL_ttf.
 void render_text(SDL_Renderer* renderer, TTF_Font* font, int x, int y, const char* text, SDL_Color color) {
@@ -49,7 +58,6 @@ char* prompt_username(SDL_Renderer* renderer, TTF_Font* font, int screen_width, 
                 }
             } else if (event.type == SDL_KEYDOWN) {
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    // If Esc is pressed during prompt, set username to "default"
                     strcpy(input, "default");
                     input_length = strlen(input);
                     done = 1;
@@ -66,11 +74,49 @@ char* prompt_username(SDL_Renderer* renderer, TTF_Font* font, int screen_width, 
         render_text(renderer, font, screen_width/2 - 100, screen_height/2 - 50, "Enter Username:", white);
         render_text(renderer, font, screen_width/2 - 100, screen_height/2, input, white);
         SDL_RenderPresent(renderer);
-        SDL_Delay(16); // approx. 60 FPS
+        SDL_Delay(16);
     }
     
     SDL_StopTextInput();
     return strdup(input);
+}
+
+// Reads the blockchain file and returns the top score for the given username.
+// If found, copies that block into topBlock (if not NULL) and returns its score; otherwise, returns -1.
+int get_user_top_score(const char *username, ScoreBlock *topBlock) {
+    FILE *fp = fopen(BLOCKCHAIN_FILE, "r");
+    if (!fp) {
+        return -1;
+    }
+    char line[2048];
+    int topScore = -1;
+    ScoreBlock temp;
+    // Use a temporary buffer for the prev_hash field that can hold up to 128 characters.
+    char prev_hash_buf[129] = {0}; // 128 characters + null terminator
+
+    while (fgets(line, sizeof(line), fp)) {
+        int ret = sscanf(line,
+            "{\"username\":\"%49[^\"]\", \"score\":%d, \"timestamp\":%ld, \"proof_of_work\":\"%64[^\"]\", \"signature\":\"%256[^\"]\", \"prev_hash\":\"%128[^\"]\", \"nonce\":%u}",
+            temp.username, &temp.score, &temp.timestamp, temp.proof_of_work, temp.signature, prev_hash_buf, &temp.nonce);
+        if (ret == 7 && strcmp(temp.username, username) == 0) {
+            // Normalize the prev_hash value by truncating to 64 characters.
+            prev_hash_buf[64] = '\0';
+            strcpy(temp.prev_hash, prev_hash_buf);
+            // Validate the digital signature.
+            if (verify_score_signature(&temp, username, temp.signature)) {
+                if (temp.score > topScore) {
+                    topScore = temp.score;
+                    if (topBlock) {
+                        *topBlock = temp;
+                    }
+                }
+            } else {
+                fprintf(stderr, "Invalid signature for user %s in blockchain record.\n", username);
+            }
+        }
+    }
+    fclose(fp);
+    return topScore;
 }
 
 void game_loop() {
@@ -101,7 +147,6 @@ void game_loop() {
         return;
     }
     
-    // Load font from src directory.
     TTF_Font* font = TTF_OpenFont("src/Arial.ttf", 16);
     if (!font) {
         SDL_Log("TTF_OpenFont Error: %s", TTF_GetError());
@@ -114,10 +159,27 @@ void game_loop() {
     
     int screen_width = 800;
     int screen_height = 600;
+
+    /* --- NEW: Ask for username and generate key pair BEFORE initializing game objects --- */
+    char *username = load_username();
+    if (!username) {
+        username = prompt_username(renderer, font, screen_width, screen_height);
+        if (!username) {
+            username = strdup("default");
+        }
+        save_username(username);
+    }
+    if (!ensure_keypair(username)) {
+        fprintf(stderr, "Key pair generation failed for user %s\n", username);
+        // Optionally exit if keypair generation is critical.
+    }
+    printf("[DEBUG][C] Starting game with username: %s\n", username);
+    /* -------------------------------------------------------------------------- */
+
+    // Now initialize game objects.
     Player player;
     init_player(&player, screen_width, screen_height);
     
-    // Initialize dynamic bullet pool.
     BulletPool bulletPool;
     init_bullet_pool(&bulletPool);
     
@@ -135,11 +197,14 @@ void game_loop() {
     // Ensure highscore directory exists.
     struct stat st = {0};
     if (stat("highscore", &st) == -1) {
-        mkdir("highscore", 0755);
+        if (mkdir("highscore", 0755) == -1) {
+            fprintf(stderr, "Error creating highscore directory: %s\n", strerror(errno));
+        }
     }
     
     srand((unsigned int)time(NULL));
     
+    // Main game loop.
     while (running) {
         frame++;
         spawnTimer++;
@@ -169,7 +234,6 @@ void game_loop() {
         else
             activate_shield(&player, 0);
         
-        // Check for quit keys (Q and Escape) in the event loop.
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT)
                 running = 0;
@@ -182,7 +246,6 @@ void game_loop() {
         update_shield_energy(&player);
         update_bullets(&bulletPool);
         
-        // Increase spawn rate with score.
         float baseRate = 0.5f;
         float rateIncrease = score / 500.0f;
         float desiredSpawnRate = baseRate + rateIncrease;
@@ -196,9 +259,10 @@ void game_loop() {
             spawnTimer = 0;
         }
         
-        float difficulty = 1.0f + ((score > 5000 ? 5000 : score) / 1000.0f);
-        update_enemies(enemies, player.x, player.y, difficulty);
+        float diffScale = 1.0f + ((score > 5000 ? 5000 : score) / 1000.0f);
+        update_enemies(enemies, player.x, player.y, diffScale);
         
+        // Process collisions between bullets and enemies.
         for (int i = 0; i < bulletPool.count; i++) {
             if (bulletPool.bullets[i].active) {
                 for (int j = 0; j < MAX_ENEMIES; j++) {
@@ -219,6 +283,7 @@ void game_loop() {
             }
         }
         
+        // Process collisions between enemies and the player.
         for (int j = 0; j < MAX_ENEMIES; j++) {
             if (enemies[j].active) {
                 float dx = player.x - enemies[j].x;
@@ -236,18 +301,46 @@ void game_loop() {
         score = (int)(now - startTime) + (enemiesKilled * 10);
         
         if (player.health <= 0) {
-            // At game over, prompt for username via SDL window.
-            char *username = load_username();
-            if (!username) {
-                username = prompt_username(renderer, font, screen_width, screen_height);
-                if (!username) {
-                    username = strdup("default");
-                }
-                save_username(username);
+            // Game over: use the stored username.
+            printf("[DEBUG][C] Game over. Using username: %s\n", username);
+            
+            // Get the previous block (if any) for proper chain linkage.
+            ScoreBlock topBlock = {0};
+            int prevScore = get_user_top_score(username, &topBlock);
+            ScoreBlock newBlock = {0};
+            strncpy(newBlock.username, username, sizeof(newBlock.username)-1);
+            newBlock.score = score;
+            newBlock.timestamp = now;
+            if (prevScore < 0) {
+                // No previous block exists – genesis block.
+                memset(newBlock.prev_hash, '0', HASH_STR_LEN - 1);
+                newBlock.prev_hash[HASH_STR_LEN - 1] = '\0';
+                add_score_block(&newBlock, NULL, DIFFICULTY);
+            } else {
+                // Use the previous block’s proof-of-work for chain linkage.
+                strncpy(newBlock.prev_hash, topBlock.proof_of_work, HASH_STR_LEN);
+                newBlock.prev_hash[HASH_STR_LEN - 1] = '\0';
+                add_score_block(&newBlock, &topBlock, DIFFICULTY);
             }
             
-            int highscore = load_highscore_for_username(username);
+            // Sign the block.
+            if (!sign_score(&newBlock, username, newBlock.signature)) {
+                fprintf(stderr, "Failed to sign score block for user %s.\n", username);
+            } else {
+                // Append the new block in JSON format.
+                FILE *fp = fopen(BLOCKCHAIN_FILE, "a");
+                if (fp) {
+                    fprintf(fp,
+                        "{\"username\":\"%s\", \"score\":%d, \"timestamp\":%ld, \"proof_of_work\":\"%s\", \"signature\":\"%s\", \"prev_hash\":\"%s\", \"nonce\":%u}\n",
+                        newBlock.username, newBlock.score, newBlock.timestamp,
+                        newBlock.proof_of_work, newBlock.signature, newBlock.prev_hash, newBlock.nonce);
+                    fclose(fp);
+                } else {
+                    fprintf(stderr, "Failed to open blockchain file for appending.\n");
+                }
+            }
             
+            // Display game over screen.
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
             SDL_Color white = {255, 255, 255, 255};
@@ -259,22 +352,9 @@ void game_loop() {
             render_text(renderer, font, screen_width/2 - 120, screen_height/2 - 30, buffer, white);
             sprintf(buffer, "Score: %d", score);
             render_text(renderer, font, screen_width/2 - 120, screen_height/2 - 10, buffer, white);
-            // Only update high score file if the username is "default"
-            if (strcmp(username, "default") == 0) {
-                if (score > highscore) {
-                    save_highscore_for_username(username, score);
-                    render_text(renderer, font, screen_width/2 - 120, screen_height/2 + 10, "New High Score!", white);
-                } else {
-                    sprintf(buffer, "High Score: %d", highscore);
-                    render_text(renderer, font, screen_width/2 - 120, screen_height/2 + 10, buffer, white);
-                }
-            } else {
-                sprintf(buffer, "High Score: %d", highscore);
-                render_text(renderer, font, screen_width/2 - 120, screen_height/2 + 10, buffer, white);
-            }
+            render_text(renderer, font, screen_width/2 - 120, screen_height/2 + 10, "Score submitted securely!", white);
             SDL_RenderPresent(renderer);
             SDL_Delay(3000);
-            free(username);
             running = 0;
             break;
         }
@@ -302,5 +382,8 @@ void game_loop() {
     SDL_DestroyWindow(win);
     TTF_Quit();
     SDL_Quit();
+    
+    // Free the username after the game loop ends.
+    free(username);
 }
 

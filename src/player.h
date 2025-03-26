@@ -2,6 +2,7 @@
 #define PLAYER_H
 
 #include <SDL2/SDL.h>
+#include "debug.h"
 
 #define SHIP_SIZE 20.0f   // Define the ship's size
 

@@ -199,3 +199,27 @@ This document chronicles all major changes and improvements made to QuantumStrik
 
 ---
 
+Below is an example changelog entry for the new blockchain high score and cheater detection features:
+
+---
+
+## [0.1.6] - Blockchain Validation Addition
+
+### Added
+- **Blockchain-Based High Score System:**  
+  Implemented a blockchain mechanism for score submission. Each score block now includes a proof-of-work and digital signature, ensuring score integrity.
+- **Score Verification:**  
+  Added `verify_scores.py` to validate each block’s proof-of-work and digital signature. Invalid scores are flagged.
+- **Cheater Detection:**  
+  Integrated logic in the high score update process so that any score blocks failing verification are classified as "cheaters" and will be listed in a dedicated section in the README.
+- **Automated Leaderboard Update:**  
+  Modified `update_highscores.py` to call the verification process before updating the README. The script now updates both the top scores section and a new cheaters section.
+- **README Documentation:**  
+  Updated the README to include new sections for the leaderboard and cheaters, and detailed the new blockchain verification workflow (which is triggered via GitHub Actions).
+
+### Fixed
+- Adjusted chain linkage verification in the blockchain module to properly handle genesis blocks and non-genesis blocks.
+
+---
+
+
