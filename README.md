@@ -166,11 +166,12 @@ QuantumStriker/
 
 - **Cheaters Section:**  
   Inserted between markers:
-  ```markdown
-  <!-- CHEATERS_START -->
+
+```markdown
+<!-- CHEATERS_START -->
 No cheaters found.
 <!-- CHEATERS_END -->
-  ```
+```
 
 The GitHub Actions workflow (via `.github/workflows/update-highscores.yml`) runs the `update_highscores.py` script periodically to update these sections.
 
