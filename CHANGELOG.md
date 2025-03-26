@@ -186,3 +186,38 @@ This document chronicles all major changes and improvements made to QuantumStrik
 
 ---
 
+Below is a changelog entry for version **0.1.8** that encapsulates all the enhancements and fixes implemented during our recent updates:
+
+---
+
+## [0.1.8] - 9 new enemies. Improved AI. Additional controls. 
+
+### Added
+- **Dynamic Ship Sizing:**  
+  The player's ship can now be resized dynamically during gameplay. Users can increase, decrease, and reset the ship size using the UP, DOWN, and Right Shift keys, respectively.
+
+- **Advanced Enemy Types & Spawning:**  
+  The enemy spawning algorithm has been revamped to use the current score as a modifier. This change allows advanced enemy types—such as shooters, tanks, evasive, fast, stealth, and bosses—to spawn progressively as the player’s score increases.
+
+- **Improved Shooter Enemy AI:**  
+  Shooter enemies now maintain a safe distance of approximately 75 units from the player. They will back off if they get too close while continuously shooting at the player with a randomized (±10°) offset for imperfect aim.
+
+- **Enhanced Collision Detection:**  
+  - Collisions between the player and any enemy now correctly reduce the player's health.  
+  - Enemy bullets (marked with an ownership flag) now inflict damage on the player if the shield is inactive.
+  
+- **Bullet Ownership Flag:**  
+  The bullet module has been updated to include an “isEnemy” flag, allowing differentiation between player-fired and enemy-fired bullets during collision processing.
+
+### Fixed
+- Resolved issues where shooter enemies did not fire accurately at the player.
+- Fixed the spawn logic that was previously using a fixed modifier, which prevented advanced enemy types from appearing.
+- Corrected missing collision detection between the player and enemies, ensuring that all enemy types inflict damage upon collision.
+- Addressed duplicate function definitions (e.g., `enemy_shoot`) to avoid linkage errors.
+
+### Changed
+- Refactored the enemy spawn and update logic to integrate the new AI behaviors while preserving existing gameplay and blockchain high score functionality.
+- Maintained full compatibility with previous features (blockchain submission, UI, debugging) while enhancing enemy behavior and player interactions.
+
+---
+

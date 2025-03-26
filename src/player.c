@@ -27,8 +27,9 @@ void init_player(Player *player, int screen_width, int screen_height) {
     player->health = 5;
     player->energy = MAX_ENERGY;
     player->shieldActive = 0;
-    DEBUG_PRINT(2, 3, "Player initialized: pos=(%.2f, %.2f), angle=%.2f, health=%d, energy=%.2f",
-                player->x, player->y, player->angle, player->health, player->energy);
+    player->size = DEFAULT_SHIP_SIZE;
+    DEBUG_PRINT(2, 3, "Player initialized: pos=(%.2f, %.2f), angle=%.2f, health=%d, energy=%.2f, size=%.2f",
+                player->x, player->y, player->angle, player->health, player->energy, player->size);
 }
 
 void rotate_player(Player *player, float angle_delta) {
@@ -112,17 +113,17 @@ void activate_shield(Player *player, int active) {
 //   p3 = (-size*0.3, size)
 //   p4 = (-size*0.6, 0)
 void draw_player(Player *player, SDL_Renderer* renderer, int screen_x, int screen_y) {
-    float size = SHIP_SIZE;
+    //float size = SHIP_SIZE;
     const int numPoints = 5;
     Sint16 vx[numPoints], vy[numPoints];
     // We want 0° to be up; so adjust by subtracting 90°.
     float angleRad = (player->angle - 90) * (M_PI / 180.0f);
     float model[5][2] = {
-        {0, -size},
-        {size * 0.6f, 0},
-        {size * 0.3f, size},
-        {-size * 0.3f, size},
-        {-size * 0.6f, 0}
+        {0, -player->size},
+        {player->size * 0.6f, 0},
+        {player->size * 0.3f, player->size},
+        {-player->size * 0.3f, player->size},
+        {-player->size * 0.6f, 0}
     };
     for (int i = 0; i < numPoints; i++) {
         float x = model[i][0];
@@ -136,8 +137,8 @@ void draw_player(Player *player, SDL_Renderer* renderer, int screen_x, int scree
     aapolygonRGBA(renderer, vx, vy, numPoints, 0, 180, 0, 255);
     
     if (player->shieldActive) {
-        rectangleRGBA(renderer, screen_x - (int)size - 5, screen_y - (int)size - 5,
-                      screen_x + (int)size + 5, screen_y + (int)size + 5,
+        rectangleRGBA(renderer, screen_x - (int)player->size - 5, screen_y - (int)player->size - 5,
+                      screen_x + (int)player->size + 5, screen_y + (int)player->size + 5,
                       0, 200, 255, 255);
     }
     DEBUG_PRINT(3, 2, "Player drawn at screen position (%d, %d)", screen_x, screen_y);
@@ -146,12 +147,33 @@ void draw_player(Player *player, SDL_Renderer* renderer, int screen_x, int scree
 // Compute the tip of the ship (spawn point for bullets).
 // In model space, the tip is at (0, -size). Rotate it and add player's world position.
 void get_ship_tip(const Player *player, float *tip_x, float *tip_y) {
-    float size = SHIP_SIZE;
     float angleRad = (player->angle - 90) * (M_PI / 180.0f);
-    float tx = size * sinf(angleRad);
-    float ty = -size * cosf(angleRad);
+    float tx = player->size * sinf(angleRad);
+    float ty = -player->size * cosf(angleRad);
     *tip_x = player->x + tx;
     *tip_y = player->y + ty;
     DEBUG_PRINT(3, 2, "Ship tip computed: (%.2f, %.2f)", *tip_x, *tip_y);
 }
 
+void increase_ship_size(Player *player) {
+    if (player->size < MAX_SHIP_SIZE) {
+        player->size += 1.0f; // Increase size by 1 unit
+        if (player->size > MAX_SHIP_SIZE)
+            player->size = MAX_SHIP_SIZE;
+        DEBUG_PRINT(3, 2, "Increased ship size to %.2f", player->size);
+    }
+}
+
+void decrease_ship_size(Player *player) {
+    if (player->size > MIN_SHIP_SIZE) {
+        player->size -= 1.0f; // Decrease size by 1 unit
+        if (player->size < MIN_SHIP_SIZE)
+            player->size = MIN_SHIP_SIZE;
+        DEBUG_PRINT(3, 2, "Decreased ship size to %.2f", player->size);
+    }
+}
+
+void reset_ship_size(Player *player) {
+    player->size = DEFAULT_SHIP_SIZE;
+    DEBUG_PRINT(3, 2, "Reset ship size to default (%.2f)", player->size);
+}

@@ -106,5 +106,5 @@
 ## Documentation
 
 - [ ] Expand in-code documentation and comments.
-- [ ] Maintain and update README.md, CONTRIBUTING.md, and CHANGELOG.md with project progress and new features.
+- [X] Maintain and update README.md, CONTRIBUTING.md, and CHANGELOG.md with project progress and new features.
 

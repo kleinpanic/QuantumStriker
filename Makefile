@@ -1,4 +1,4 @@
-VERSION = 0.1.7
+VERSION = 0.1.8
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -D_XOPEN_SOURCE=700 `sdl2-config --cflags`
 LIBS = `sdl2-config --libs` -lSDL2_ttf -lSDL2_gfx -lm -lcrypto
@@ -29,12 +29,12 @@ endif
 
 all: $(TARGET)
 	@echo "Build complete."
-	@echo "Makefile Version: $(VERSION)"
+	@echo "QuantumStriker Makefile Version: $(VERSION)"
 	@rm -rf $(OBJDIR)
 
 debug: $(TARGET)
 	@echo "Debug build complete. Object files retained."
-	@echo "Makefile Version: $(VERSION)"
+	@echo "QuantumStriker Makefile Version: $(VERSION)"
 
 
 $(TARGET): $(OBJECTS)
@@ -47,7 +47,7 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
 version:
-	@echo "Makefile Version: $(VERSION)"
+	@echo "QuantumStriker Makefile Version: $(VERSION)"
 
 clean:
 	rm -rf $(OBJDIR) $(TARGET)

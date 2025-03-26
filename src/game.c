@@ -95,7 +95,7 @@ int get_user_top_score(const char *username, ScoreBlock *topBlock) {
     char line[2048];
     int topScore = -1;
     ScoreBlock temp;
-    char prev_hash_buf[129] = {0};  // Buffer for prev_hash (128 chars + null)
+    char prev_hash_buf[129] = {0};
     while (fgets(line, sizeof(line), fp)) {
         int ret = sscanf(line,
             "{\"username\":\"%49[^\"]\", \"score\":%d, \"timestamp\":%ld, \"proof_of_work\":\"%64[^\"]\", \"signature\":\"%512[^\"]\", \"prev_hash\":\"%128[^\"]\", \"nonce\":%u}",
@@ -106,9 +106,8 @@ int get_user_top_score(const char *username, ScoreBlock *topBlock) {
             if (verify_score_signature(&temp, username, temp.signature)) {
                 if (temp.score > topScore) {
                     topScore = temp.score;
-                    if (topBlock) {
+                    if (topBlock)
                         *topBlock = temp;
-                    }
                 }
             } else {
                 DEBUG_PRINT(2, 0, "Invalid signature for user %s in blockchain record", username);
@@ -161,22 +160,20 @@ void game_loop() {
     int screen_width = 800;
     int screen_height = 600;
 
-    /* --- NEW: Ask for username and generate key pair BEFORE initializing game objects --- */
+    // Get or prompt username.
     char *username = load_username();
     if (!username) {
         username = prompt_username(renderer, font, screen_width, screen_height);
-        if (!username) {
+        if (!username)
             username = strdup("default");
-        }
         save_username(username);
     }
     if (!ensure_keypair(username)) {
         DEBUG_PRINT(2, 0, "Key pair generation failed for user %s", username);
-        // Optionally exit if keypair generation is critical.
     }
     DEBUG_PRINT(2, 3, "Starting game with username: %s", username);
 
-    // Now initialize game objects.
+    // Initialize game objects.
     Player player;
     init_player(&player, screen_width, screen_height);
     
@@ -197,11 +194,10 @@ void game_loop() {
     // Ensure highscore directory exists.
     struct stat st = {0};
     if (stat("highscore", &st) == -1) {
-        if (mkdir("highscore", 0755) == -1) {
+        if (mkdir("highscore", 0755) == -1)
             DEBUG_PRINT(2, 0, "Error creating highscore directory: %s", strerror(errno));
-        } else {
+        else
             DEBUG_PRINT(2, 3, "Highscore directory created");
-        }
     }
     
     srand((unsigned int)time(NULL));
@@ -214,10 +210,18 @@ void game_loop() {
         const Uint8 *keystate = SDL_GetKeyboardState(NULL);
         float speedMultiplier = (keystate[SDL_SCANCODE_LCTRL] || keystate[SDL_SCANCODE_RCTRL]) ? 2.0f : 1.0f;
         
+        // Player controls:
         if (keystate[SDL_SCANCODE_LEFT])
             rotate_player(&player, -2 * speedMultiplier);
         if (keystate[SDL_SCANCODE_RIGHT])
             rotate_player(&player, 2 * speedMultiplier);
+        // Ship sizing keys:
+        if (keystate[SDL_SCANCODE_DOWN])
+            decrease_ship_size(&player);
+        if (keystate[SDL_SCANCODE_UP])
+            increase_ship_size(&player);
+        if (keystate[SDL_SCANCODE_RSHIFT])
+            reset_ship_size(&player);
         if (keystate[SDL_SCANCODE_W])
             thrust_player(&player);
         if (keystate[SDL_SCANCODE_S])
@@ -229,7 +233,7 @@ void game_loop() {
         if (keystate[SDL_SCANCODE_SPACE]) {
             float tip_x, tip_y;
             get_ship_tip(&player, &tip_x, &tip_y);
-            shoot_bullet(&bulletPool, tip_x, tip_y, player.angle);
+            shoot_bullet(&bulletPool, tip_x, tip_y, player.angle, 0); // 0: player's bullet
         }
         if (keystate[SDL_SCANCODE_E])
             activate_shield(&player, 1);
@@ -246,6 +250,7 @@ void game_loop() {
             }
         }
         
+        // Update game objects.
         update_player(&player);
         update_shield_energy(&player);
         update_bullets(&bulletPool);
@@ -258,8 +263,9 @@ void game_loop() {
         float spawnIntervalSeconds = 1.0f / desiredSpawnRate;
         int spawnIntervalFrames = (int)(spawnIntervalSeconds / (FRAME_DELAY / 1000.0f));
         
+        // Spawn enemy based on current score.
         if (spawnTimer > spawnIntervalFrames) {
-            spawn_enemy(enemies, player.x, player.y, 1.0f);
+            spawn_enemy(enemies, player.x, player.y, score);
             spawnTimer = 0;
             DEBUG_PRINT(3, 2, "Enemy spawned; spawnTimer reset");
         }
@@ -267,9 +273,22 @@ void game_loop() {
         float diffScale = 1.0f + ((score > 5000 ? 5000 : score) / 1000.0f);
         update_enemies(enemies, player.x, player.y, diffScale);
         
-        // Process collisions between bullets and enemies.
+        // Enemy shooting: For shooter-type enemies, if within range and shoot timer expired, fire enemy bullet.
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (enemies[i].active && enemies[i].type == ENEMY_SHOOTER) {
+                float dx = player.x - enemies[i].x;
+                float dy = player.y - enemies[i].y;
+                float distance = sqrtf(dx * dx + dy * dy);
+                if (distance < 300 && enemies[i].shootTimer <= 0) {
+                    enemy_shoot(&enemies[i], &bulletPool, player.x, player.y);
+                    enemies[i].shootTimer = 120;
+                }
+            }
+        }
+        
+        // Process collisions between player's bullets and enemies.
         for (int i = 0; i < bulletPool.count; i++) {
-            if (bulletPool.bullets[i].active) {
+            if (bulletPool.bullets[i].active && bulletPool.bullets[i].isEnemy == 0) {
                 for (int j = 0; j < MAX_ENEMIES; j++) {
                     if (enemies[j].active) {
                         float dx = bulletPool.bullets[i].x - enemies[j].x;
@@ -278,7 +297,7 @@ void game_loop() {
                         if (dist < 15) {
                             enemies[j].health -= 1;
                             bulletPool.bullets[i].active = 0;
-                            DEBUG_PRINT(3, 2, "Bullet collision: enemy %d hit; new health = %d", j, enemies[j].health);
+                            DEBUG_PRINT(3, 2, "Player bullet hit enemy %d; new health = %d", j, enemies[j].health);
                             if (enemies[j].health <= 0) {
                                 enemies[j].active = 0;
                                 enemiesKilled++;
@@ -290,6 +309,24 @@ void game_loop() {
             }
         }
         
+        // Process collisions between enemy bullets and the player.
+        for (int i = 0; i < bulletPool.count; i++) {
+            if (bulletPool.bullets[i].active && bulletPool.bullets[i].isEnemy == 1) {
+                float dx = bulletPool.bullets[i].x - player.x;
+                float dy = bulletPool.bullets[i].y - player.y;
+                float dist = sqrtf(dx * dx + dy * dy);
+                if (dist < 15) {
+                    if (!player.shieldActive) {
+                        player.health -= 1;
+                        DEBUG_PRINT(3, 0, "Player hit by enemy bullet; health reduced to %d", player.health);
+                    } else {
+                        DEBUG_PRINT(3, 2, "Enemy bullet blocked by shield.");
+                    }
+                    bulletPool.bullets[i].active = 0;
+                }
+            }
+        }
+
         // Process collisions between enemies and the player.
         for (int j = 0; j < MAX_ENEMIES; j++) {
             if (enemies[j].active) {
@@ -312,7 +349,6 @@ void game_loop() {
         if (player.health <= 0) {
             DEBUG_PRINT(2, 2, "Game over. Using username: %s", username);
             
-            // Get the previous block (if any) for proper chain linkage.
             ScoreBlock lastBlock = {0};
             int exists = get_last_block_for_user(username, &lastBlock);
             ScoreBlock newBlock = {0};
@@ -320,24 +356,20 @@ void game_loop() {
             newBlock.score = score;
             newBlock.timestamp = now;
             if (!exists) {
-                // No previous block exists – genesis block.
                 memset(newBlock.prev_hash, '0', HASH_STR_LEN - 1);
                 newBlock.prev_hash[HASH_STR_LEN - 1] = '\0';
                 add_score_block(&newBlock, NULL, DIFFICULTY);
                 DEBUG_PRINT(2, 3, "Genesis block created for user %s", username);
             } else {
-                // Use the previous block’s proof-of-work for chain linkage.
                 strncpy(newBlock.prev_hash, lastBlock.proof_of_work, HASH_STR_LEN);
                 newBlock.prev_hash[HASH_STR_LEN - 1] = '\0';
                 add_score_block(&newBlock, &lastBlock, DIFFICULTY);
                 DEBUG_PRINT(2, 3, "New block chained to last block for user %s", username);
             }
             
-            // Sign the block.
             if (!sign_score(&newBlock, username, newBlock.signature)) {
                 DEBUG_PRINT(2, 0, "Failed to sign score block for user %s", username);
             } else {
-                // Append the new block in JSON format.
                 FILE *fp = fopen(BLOCKCHAIN_FILE, "a");
                 if (fp) {
                     fprintf(fp,
@@ -351,7 +383,6 @@ void game_loop() {
                 }
             }
             
-            // Display game over screen.
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             SDL_RenderClear(renderer);
             SDL_Color white = {255, 255, 255, 255};
@@ -394,7 +425,6 @@ void game_loop() {
     TTF_Quit();
     SDL_Quit();
     
-    // Free the username after the game loop ends.
     free(username);
 }
 
