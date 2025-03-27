@@ -1,4 +1,4 @@
-VERSION = 0.1.8
+VERSION = 0.1.9
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -D_XOPEN_SOURCE=700 `sdl2-config --cflags`
 LIBS = `sdl2-config --libs` -lSDL2_ttf -lSDL2_gfx -lm -lcrypto

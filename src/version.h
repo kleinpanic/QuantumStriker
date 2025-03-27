@@ -1,7 +1,7 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-#define NEBULA_NEXUS_VERSION "0.1.8"
+#define QUANTUM_STRIKER_VERSION "0.1.9"
 
 #endif
 

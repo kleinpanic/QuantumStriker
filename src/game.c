@@ -8,9 +8,11 @@
 #include "signature.h"
 #include "encryption.h"
 #include "debug.h"
+#include "config.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
@@ -24,8 +26,8 @@
 #define BLOCKCHAIN_FILE "highscore/blockchain.txt"
 #define DIFFICULTY 4     // PoW difficulty: number of leading zeros required
 
-// Forward declaration.
-int get_user_top_score(const char *username, ScoreBlock *topBlock);
+int shakeTimer = 0;
+float shakeMagnitude = 0.0f;
 
 // Helper function to render text using SDL_ttf.
 void render_text(SDL_Renderer* renderer, TTF_Font* font, int x, int y, const char* text, SDL_Color color) {
@@ -120,6 +122,10 @@ int get_user_top_score(const char *username, ScoreBlock *topBlock) {
 }
 
 void game_loop() {
+    Uint32 windowFlags = SDL_WINDOW_SHOWN; // | SDL_WINDOW_RESIZABLE;
+    if (g_fullscreen) {
+        windowFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         DEBUG_PRINT(1, 0, "SDL_Init Error: %s", SDL_GetError());
         return;
@@ -129,13 +135,22 @@ void game_loop() {
         SDL_Quit();
         return;
     }
-    
-    SDL_Window* win = SDL_CreateWindow("QuantumStriker", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);
+
+    int screen_width = 800, screen_height = 600;
+    SDL_Window* win = SDL_CreateWindow("QuantumStriker", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, windowFlags);
     if (!win) {
         DEBUG_PRINT(1, 0, "SDL_CreateWindow Error: %s", SDL_GetError());
         TTF_Quit();
         SDL_Quit();
         return;
+    }
+
+    if (g_fullscreen) {
+        SDL_DisplayMode mode;
+        if (SDL_GetCurrentDisplayMode(0, &mode) == 0) {
+            screen_width = mode.w;
+            screen_height = mode.h;
+        }
     }
     
     SDL_Renderer* renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -156,9 +171,11 @@ void game_loop() {
         SDL_Quit();
         return;
     }
-    
-    int screen_width = 800;
-    int screen_height = 600;
+
+    Explosion explosions[MAX_EXPLOSIONS];
+    for (int k = 0; k < MAX_EXPLOSIONS; k++) {
+        explosions[k].lifetime = 0;
+    }
 
     // Get or prompt username.
     char *username = load_username();
@@ -271,20 +288,20 @@ void game_loop() {
         }
         
         float diffScale = 1.0f + ((score > 5000 ? 5000 : score) / 1000.0f);
-        update_enemies(enemies, player.x, player.y, diffScale);
+        update_enemies(enemies, player.x, player.y, diffScale, &bulletPool);
         
         // Enemy shooting: For shooter-type enemies, if within range and shoot timer expired, fire enemy bullet.
-        for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (enemies[i].active && enemies[i].type == ENEMY_SHOOTER) {
-                float dx = player.x - enemies[i].x;
-                float dy = player.y - enemies[i].y;
-                float distance = sqrtf(dx * dx + dy * dy);
-                if (distance < 300 && enemies[i].shootTimer <= 0) {
-                    enemy_shoot(&enemies[i], &bulletPool, player.x, player.y);
-                    enemies[i].shootTimer = 120;
-                }
-            }
-        }
+        //for (int i = 0; i < MAX_ENEMIES; i++) {
+        //    if (enemies[i].active && enemies[i].type == ENEMY_SHOOTER) {
+        //        float dx = player.x - enemies[i].x;
+        //        float dy = player.y - enemies[i].y;
+        //        float distance = sqrtf(dx * dx + dy * dy);
+        //        if (distance < 300 && enemies[i].shootTimer <= 0) {
+        //            enemy_shoot(&enemies[i], &bulletPool, player.x, player.y);
+        //            enemies[i].shootTimer = 120;
+        //        }
+        //    }
+        //}
         
         // Process collisions between player's bullets and enemies.
         for (int i = 0; i < bulletPool.count; i++) {
@@ -299,6 +316,15 @@ void game_loop() {
                             bulletPool.bullets[i].active = 0;
                             DEBUG_PRINT(3, 2, "Player bullet hit enemy %d; new health = %d", j, enemies[j].health);
                             if (enemies[j].health <= 0) {
+                                for (int k = 0; k < MAX_EXPLOSIONS; k++) {
+                                    if (explosions[k].lifetime <= 0) {
+                                        explosions[k].x = enemies[j].x;
+                                        explosions[k].y = enemies[j].y;
+                                        explosions[k].radius = 5.0f;
+                                        explosions[k].lifetime = 30; // lasts 30 frames
+                                        break;
+                                    }
+                                }
                                 enemies[j].active = 0;
                                 enemiesKilled++;
                                 DEBUG_PRINT(3, 3, "Enemy %d destroyed; total enemies killed = %d", j, enemiesKilled);
@@ -318,6 +344,8 @@ void game_loop() {
                 if (dist < 15) {
                     if (!player.shieldActive) {
                         player.health -= 1;
+                        shakeTimer = 20;
+                        shakeMagnitude = 10.0f;
                         DEBUG_PRINT(3, 0, "Player hit by enemy bullet; health reduced to %d", player.health);
                     } else {
                         DEBUG_PRINT(3, 2, "Enemy bullet blocked by shield.");
@@ -336,6 +364,8 @@ void game_loop() {
                 if (dist < 20) {
                     if (!player.shieldActive) {
                         player.health -= 1;
+                        shakeTimer = 20;
+                        shakeMagnitude = 10.0f;
                         DEBUG_PRINT(3, 0, "Player hit by enemy %d; health reduced to %d", j, player.health);
                     }
                     enemies[j].active = 0;
@@ -403,6 +433,11 @@ void game_loop() {
         
         float cam_x = player.x - screen_width/2;
         float cam_y = player.y - screen_height/2;
+        if (shakeTimer > 0) {
+            cam_x += (rand() % ((int)(shakeMagnitude * 2) + 1)) - shakeMagnitude;
+            cam_y += (rand() % ((int)(shakeMagnitude * 2) + 1)) - shakeMagnitude;
+            shakeTimer--;
+        }
         
         draw_background(renderer, cam_x, cam_y, screen_width, screen_height);
         SDL_Color white = {255, 255, 255, 255};
@@ -413,6 +448,16 @@ void game_loop() {
         draw_bullets(&bulletPool, renderer, cam_x, cam_y);
         draw_enemies(enemies, renderer, cam_x, cam_y);
         draw_player(&player, renderer, screen_width/2, screen_height/2);
+
+        for (int k = 0; k < MAX_EXPLOSIONS; k++) {
+            if (explosions[k].lifetime > 0) {
+                explosions[k].radius += 1.0f;  // Expand explosion radius
+                int alpha = (int)(255 * ((float)explosions[k].lifetime / 30.0f)); // Fade effect
+                filledCircleRGBA(renderer, (int)(explosions[k].x - cam_x), (int)(explosions[k].y - cam_y),
+                                 (int)explosions[k].radius, 255, 165, 0, alpha);
+                explosions[k].lifetime--;
+            }
+        }
         
         SDL_RenderPresent(renderer);
         SDL_Delay(FRAME_DELAY);

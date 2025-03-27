@@ -2,6 +2,10 @@
 #include "version.h"
 #include "score.h"
 #include "debug.h"
+#include "config.h"
+int g_fullscreen = 0;
+int g_testing_mode = 0;
+int g_dev_auto_mode = 0;
 
 #include <stdio.h>
 #include <string.h>
@@ -16,7 +20,7 @@ int main(int argc, char *argv[]) {
         if (strcmp(argv[i], "--version") == 0) {
             DEBUG_PRINT(2, 3, "Version flag activated.");
             DEBUG_PRINT(3, 3, "Version flag activated. Version number will be read from version.h file, and status will return 0");
-            printf("Nebula Nexus version %s\n", NEBULA_NEXUS_VERSION);
+            printf("Quantum Striker Version %s\n", QUANTUM_STRIKER_VERSION);
             return 0;
         } else if (strcmp(argv[i], "--help") == 0) {
             DEBUG_PRINT(2, 3, "Help flag active");
@@ -41,9 +45,11 @@ int main(int argc, char *argv[]) {
             DEBUG_PRINT(2, 3, "Debug mode enabled with level %d", g_debug_level);
             DEBUG_PRINT(3, 3, "Debug mode enabled with level %d. Highest debug enabled.", g_debug_level);
         } else if (strcmp(argv[i], "--fullscreen") == 0) {
-            DEBUG_PRINT(2, 3, "Fullscreen flag active (not implemented)");
-            printf("Fullscreen support will be implemented in a future release.\n");
-            return 0;
+
+            g_fullscreen = 1;
+            DEBUG_PRINT(1, 3, "Fullscreen flag activated.");
+            DEBUG_PRINT(2, 3, "Fullscreen flag activated.");
+            DEBUG_PRINT(3, 3, "Fullscreen flag activated by user thru --fullscreen flag.");
         } else if (strcmp(argv[i], "--highscores") == 0) {
             DEBUG_PRINT(2, 3, "Highscores flag active");
             DIR *dir = opendir("highscore");
@@ -76,6 +82,13 @@ int main(int argc, char *argv[]) {
             printf("+----------------------+------------+\n");
             closedir(dir);
             return 0;
+        } if (strcmp(argv[i], "--development") == 0 && i + 1 < argc) {
+            if (strcmp(argv[i+1], "auto") == 0) {
+                g_dev_auto_mode = 1;
+            }
+            // Add more sub-flags as needed.
+        } if (strcmp(argv[i], "--testing") == 0) {
+            g_testing_mode = 1;
         } else {
             printf("Unknown option: %s\nTry '--help' for usage.\n", argv[i]);
             return 1;

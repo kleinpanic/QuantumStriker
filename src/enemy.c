@@ -14,9 +14,10 @@
 void enemy_shoot(Enemy *enemy, BulletPool *pool, float player_x, float player_y) {
     float dx = player_x - enemy->x;
     float dy = player_y - enemy->y;
-    float angle = atan2f(dy, dx) * 180.0f / M_PI + 90.0f; // adjust so that 0° is up
+    // Removed the +90 offset so the bullet is aimed directly toward the player.
+    float angle = atan2f(dy, dx) * 180.0f / M_PI;
     shoot_bullet(pool, enemy->x, enemy->y, angle, 1); // enemy bullet
-    DEBUG_PRINT(3, 2, "Enemy of type SHOOTER fired bullet towards player at angle %.2f", angle);
+    DEBUG_PRINT(3, 2, "Enemy SHOOTER fired bullet towards player at angle %.2f", angle);
 }
 
 // Initialize all enemies and their additional fields.
@@ -27,12 +28,14 @@ void init_enemies(Enemy enemies[]) {
         enemies[i].shootTimer = 0;
         enemies[i].visible = 1;
         enemies[i].type = ENEMY_BASIC;  // default type
+        // Initialize angle so that by default it faces right (0° means to the right)
+        enemies[i].angle = 0.0f;
     }
     DEBUG_PRINT(2, 3, "Enemies initialized: %d enemies set inactive", MAX_ENEMIES);
 }
 
 // Update enemies with different behaviors based on type.
-void update_enemies(Enemy enemies[], float player_x, float player_y, float difficulty) {
+void update_enemies(Enemy enemies[], float player_x, float player_y, float difficulty, BulletPool* pool) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!enemies[i].active)
             continue;
@@ -52,32 +55,58 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
                 if (fabs(diff_y) > 2.0f)
                     enemies[i].y += (diff_y > 0 ? moveStep : -moveStep);
                 break;
-            case ENEMY_SHOOTER:
-                moveStep = 0.5f * difficulty;
-                if (distance < 75) {
-                    if (fabs(diff_x) > 2.0f)
-                        enemies[i].x -= (diff_x > 0 ? moveStep : -moveStep);
-                    if (fabs(diff_y) > 2.0f)
-                        enemies[i].y -= (diff_y > 0 ? moveStep : -moveStep);
+            case ENEMY_SHOOTER: {
+                const float desiredMin = 150.0f;
+                const float desiredMax = 300.0f;
+                const float targetDistance = (desiredMin + desiredMax) / 2.0f; // ~225 units
+                float distanceError = distance - targetDistance;
+    
+                // Calculate the desired angle directly toward the player.
+                float desiredAngle = atan2f(diff_y, diff_x) * 180.0f / M_PI;
+    
+                // Smooth rotation toward the desired angle.
+                float rotationSpeed = 5.0f; // degrees per frame
+                float angleDifference = desiredAngle - enemies[i].angle;
+                // Normalize angleDifference to [-180, 180]
+                while (angleDifference > 180.0f) angleDifference -= 360.0f;
+                while (angleDifference < -180.0f) angleDifference += 360.0f;
+    
+                if (fabs(angleDifference) < rotationSpeed) {
+                    enemies[i].angle = desiredAngle;
                 } else {
-                    // Otherwise approach the player
-                    if (fabs(diff_x) > 2.0f)
-                        enemies[i].x += (diff_x > 0 ? moveStep : -moveStep);
-                    if (fabs(diff_y) > 2.0f)
-                        enemies[i].y += (diff_y > 0 ? moveStep : -moveStep);
+                    enemies[i].angle += (angleDifference > 0 ? rotationSpeed : -rotationSpeed);
                 }
-
-                // If within 300 units and shootTimer has expired, shoot at player.
-                if (distance < 300 && enemies[i].shootTimer <= 0) {
-                    // In a real implementation, the bullet pool pointer should be passed in;
-                    // For now, we assume the game loop calls enemy_shoot() with access to the bullet pool.
-                    // Here we just set shootTimer to a reset value.
-                    enemies[i].shootTimer = 120; // reset timer
-                    // Actual shooting will be handled in game_loop (see below)
+    
+                // Position adjustment to maintain target distance.
+                float adjustment = 0.05f * fabs(distanceError) * difficulty;
+                float norm = (distance > 0) ? distance : 1.0f;
+                float unit_dx = diff_x / norm;
+                float unit_dy = diff_y / norm;
+                if (distance > targetDistance) {
+                    // Too far: move toward the player.
+                    enemies[i].x += unit_dx * adjustment;
+                    enemies[i].y += unit_dy * adjustment;
+                } else {
+                    // Too close: move away from the player.
+                    enemies[i].x -= unit_dx * adjustment;
+                    enemies[i].y -= unit_dy * adjustment;
+                }
+    
+                // Add slight random lateral movement for unpredictability.
+                enemies[i].x += ((rand() % 3) - 1) * 0.2f * difficulty;
+                enemies[i].y += ((rand() % 3) - 1) * 0.2f * difficulty;
+    
+                // Shooting: Fire only if within range, cooldown expired, and nearly aligned.
+                if (distance < desiredMax && enemies[i].shootTimer <= 0 && fabs(angleDifference) < 5.0f) {
+                    // Fire bullet along the enemy's current angle.
+                    shoot_bullet(pool, enemies[i].x, enemies[i].y, enemies[i].angle - 180, 1);
+                    DEBUG_PRINT(3, 2, "Rotating shooter fired bullet at angle %.2f, distance: %.2f", enemies[i].angle, distance);
+                    enemies[i].shootTimer = 90; // shorter cooldown for aggressive shooting
                 } else if (enemies[i].shootTimer > 0) {
                     enemies[i].shootTimer--;
                 }
                 break;
+            }
             case ENEMY_TANK:
                 moveStep = 0.3f * difficulty;
                 if (fabs(diff_x) > 2.0f)
@@ -168,13 +197,30 @@ void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float ca
             case ENEMY_BASIC:
                 filledEllipseRGBA(renderer, cx, cy, 15, 10, 255, 0, 0, 255);
                 break;
-            case ENEMY_SHOOTER:
-                SDL_SetRenderDrawColor(renderer, 255, 165, 0, 255);
-                {
-                    SDL_Rect rect = { cx - 12, cy - 8, 24, 16 };
-                    SDL_RenderFillRect(renderer, &rect);
+            case ENEMY_SHOOTER: {
+                // Draw a rotated rectangle to represent the shooter enemy.
+                // Rectangle dimensions: 24x16 (half-width = 12, half-height = 8).
+                const float halfWidth = 12.0f;
+                const float halfHeight = 8.0f;
+                float rad = enemies[i].angle * (M_PI / 180.0f);
+                // Define the four corners of the rectangle in local space.
+                float local[4][2] = {
+                    { -halfWidth, -halfHeight },
+                    {  halfWidth, -halfHeight },
+                    {  halfWidth,  halfHeight },
+                    { -halfWidth,  halfHeight }
+                };
+                Sint16 vx[4], vy[4];
+                for (int j = 0; j < 4; j++) {
+                    // Rotate the local point and translate to screen position.
+                    float rx = local[j][0] * cos(rad) - local[j][1] * sin(rad);
+                    float ry = local[j][0] * sin(rad) + local[j][1] * cos(rad);
+                    vx[j] = cx + (int)rx;
+                    vy[j] = cy + (int)ry;
                 }
+                filledPolygonRGBA(renderer, vx, vy, 4, 255, 165, 0, 255);
                 break;
+            }
             case ENEMY_TANK:
                 filledEllipseRGBA(renderer, cx, cy, 20, 14, 0, 0, 255, 255);
                 break;
@@ -274,7 +320,7 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score) {
             switch (enemies[i].type) {
                 case ENEMY_BASIC: enemies[i].health = 3; break;
                 case ENEMY_SHOOTER: enemies[i].health = 3; enemies[i].shootTimer = 120; break;
-                case ENEMY_TANK: enemies[i].health = 6; break;
+                case ENEMY_TANK: enemies[i].health = 9; break;
                 case ENEMY_EVASIVE: enemies[i].health = 3; break;
                 case ENEMY_FAST: enemies[i].health = 2; break;
                 case ENEMY_SPLITTER: enemies[i].health = 3; break;
