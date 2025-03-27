@@ -221,4 +221,35 @@ Below is a changelog entry for version **0.1.8** that encapsulates all the enhan
 
 ---
 
+## [0.1.9] - Enhanced Shooter AI, Fullscreen Mode, & New Visual Effects
+
+### Added
+- **Fullscreen & Resizable Window Support:**  
+  Introduced a new configuration flag (`g_fullscreen` in config.h) to launch the game in fullscreen mode using `SDL_WINDOW_FULLSCREEN_DESKTOP`. The window creation code in game.c now dynamically updates the screen dimensions to match the display’s current mode when fullscreen is enabled.
+
+- **Camera Shake Effect:**  
+  Added global variables (`shakeTimer` and `shakeMagnitude` in config.h) and integrated a camera shake effect into the game loop. The effect triggers whenever the player takes damage (from enemy bullets or collisions), enhancing the game’s visual impact.
+
+- **Explosion Animations for Enemies:**  
+  Implemented explosion animations using SDL2_gfx’s filledCircleRGBA. When an enemy is destroyed by a bullet (but not by collision), an expanding, fading explosion is displayed over a brief 30‑frame period.
+
+### Improved
+- **Shooter Enemy AI:**  
+  Refined shooter enemy behavior to continuously track the player. The AI now recalculates the angle and distance every frame, striving to maintain an ideal engagement range (roughly between 150 and 300 units, targeting ~225 units). When within range, the shooter fires bullets with a slight random offset (±5°) and employs a faster cooldown for more aggressive action.
+
+- **Bullet Trajectory & Ownership:**  
+  Enhanced bullet management by fine‑tuning enemy bullet trajectories to ensure they are correctly aimed at the player. The system now more reliably distinguishes enemy bullets from player-fired bullets via the `isEnemy` flag.
+
+### Fixed
+- Removed duplicate function definitions (e.g., the redundant `enemy_shoot` function) to avoid linkage errors.
+- Corrected collision detection issues so that:
+  - Player bullet impacts reduce enemy health and trigger explosion animations.
+  - Enemy bullet impacts reduce player health and trigger camera shake (if the shield isn’t active).
+  - Direct collisions between enemies and the player are consistently detected.
+
+### Changed
+- Refactored enemy spawn and update logic to integrate the new AI behaviors and visual effects while maintaining full compatibility with previous features (including blockchain-backed high score submission and in‑game UI).
+- Updated debug logging across modules to provide clearer insights into gameplay and AI behavior.
+
+---
 

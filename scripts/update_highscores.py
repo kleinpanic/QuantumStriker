@@ -150,6 +150,69 @@ def update_section_in_file(marker_start, marker_end, new_content):
         f.write(new_file_content)
     return new_file_content
 
+def extract_version_from_version_h(path):
+    try:
+        with open(path, 'r') as f:
+            content = f.read()
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+        sys.exit(1)
+    match = re.search(r'#define\s+QUANTUM_STRIKER_VERSION\s+"([^"]+)"', content)
+    if match:
+        return match.group(1)
+    print("Error: Version not found in version.h")
+    sys.exit(1)
+
+def extract_version_from_makefile(path):
+    try:
+        with open(path, 'r') as f:
+            for line in f:
+                # Assuming the Makefile has a line like: VERSION = x.y.z
+                m = re.match(r'^\s*VERSION\s*[:=]\s*([^\s]+)', line)
+                if m:
+                    return m.group(1)
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+        sys.exit(1)
+    print("Error: Version not found in Makefile")
+    sys.exit(1)
+
+def extract_last_version_from_changelog(path):
+    try:
+        with open(path, 'r') as f:
+            lines = f.readlines()
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+        sys.exit(1)
+    # Reverse iterate over lines to find a header matching "## [x.y.z]"
+    for line in reversed(lines):
+        line = line.strip()
+        match = re.match(r'^##\s*\[([^]]+)\]', line)
+        if match:
+            return match.group(1)
+    print("Error: Version not found in CHANGELOG.md")
+    sys.exit(1)
+
+def check_version_consistency():
+    version_h_path = os.path.join(BASE_DIR, "src", "version.h")
+    makefile_path = os.path.join(BASE_DIR, "Makefile")
+    changelog_path = os.path.join(BASE_DIR, "CHANGELOG.md")
+
+    version_h = extract_version_from_version_h(version_h_path)
+    makefile_version = extract_version_from_makefile(makefile_path)
+    changelog_version = extract_last_version_from_changelog(changelog_path)
+
+    print(f"\nVersion consistency check:")
+    print(f"  version.h: {version_h}")
+    print(f"  Makefile:  {makefile_version}")
+    print(f"  Changelog: {changelog_version}")
+
+    if version_h != makefile_version or version_h != changelog_version:
+        print("\nError: Version mismatch detected!")
+        sys.exit(1)
+    else:
+        print("Success: All versions match.\n")
+
 def main():
     print("Starting high score update...")
     all_blocks = load_blockchain()
@@ -172,6 +235,8 @@ def main():
     cheaters_table = generate_cheaters_table(cheater_blocks)
     update_section_in_file("<!-- CHEATERS_START -->", "<!-- CHEATERS_END -->", cheaters_table)
     print("Cheaters table updated.")
+
+    check_version_consistency()
     
     # Inform the user if running locally (manual push needed) or automatically (CI)
     if os.getenv("GITHUB_ACTIONS") is None:

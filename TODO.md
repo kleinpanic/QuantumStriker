@@ -103,7 +103,8 @@
 - [ ] Add a way to save game state, and load game state, and have it work with the blockchain.
 - [ ] Incorporate key game settings and configurations from the config file [like health, speed, enemy speed, enemy difficulty, etc] into the blockchain and add that dynamic algorithm mentioned elsewhere.
 - [ ] Make a python file that maintains the blockchain, or figure out a way to do this, the point of the program is to future proof the block chain so that past user data isn't lost with blockchain logic additions as it might take me a while to implement the blockchain configuration additions.
-- [ ] Make a python file that makes sure the change log and the version match, maybe use a small AI, or some online resource, that is able to automate changelog additions [this is kinda bloated and i don't think its a good addition for such a minute aspect of the project]
+- [X] Make a python file that makes sure the change log and the version match, 
+- [ ] For the CHANGELOG; maybe use a small AI, or some online resource, that is able to automate changelog additions [this is kinda bloated and i don't think its a good addition for such a minute aspect of the project]
 - [ ] Mimic decentralization with backup / various repositioes using different services like gitea, gitlabs, and github, or various remotes on one platform. Have a mechanism to regularly validate the blockchain against eachother, always ensuring decrenctralization, and ensuring validity and authenticity of the blockchain, and prevents some asshole from deleting the blockchain and pushing the changes. Can use my dell server as a central origin node w bb. Offer users to become part of the network on startup of the program or have it be a config option. 
 
 
