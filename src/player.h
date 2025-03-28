@@ -33,6 +33,7 @@ void get_ship_tip(const Player *player, float *tip_x, float *tip_y);
 void increase_ship_size(Player *player);
 void decrease_ship_size(Player *player);
 void reset_ship_size(Player *player);
+void wrap_player_position(Player *player);
 
 #endif
 

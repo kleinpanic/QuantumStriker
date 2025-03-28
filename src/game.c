@@ -9,6 +9,7 @@
 #include "encryption.h"
 #include "debug.h"
 #include "config.h"
+#include "menus.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -39,6 +40,209 @@ void render_text(SDL_Renderer* renderer, TTF_Font* font, int x, int y, const cha
     SDL_RenderCopy(renderer, texture, NULL, &dst);
     SDL_DestroyTexture(texture);
     SDL_FreeSurface(surface);
+}
+
+/*
+ * dev_ai_control controls the player AI behavior in auto dev mode.
+ *
+ * Operation Overview:
+ *
+ * 1. Visibility & Target Selection:
+ *    - The camera origin is computed from (player->x - screen_width/2, player->y - screen_height/2).
+ *    - For each active enemy, its screen position is computed.
+ *      Enemies outside a 50-pixel margin are skipped.
+ *    - The closest visible enemy is selected as the target.
+ *
+ * 2. Enemy Bullet Detection:
+ *    - The bullet pool is scanned for active enemy bullets.
+ *      Any enemy bullet within BULLET_DANGER_DISTANCE (150 units) adds a repulsion force (scaled by BULLET_REPULSION_FACTOR)
+ *      and sets a flag to force bullet-evading behavior.
+ *
+ * 3. Shield Activation & Evasion:
+ *    - The shield is activated if the target is very close (less than SHIELD_DISTANCE) or if an enemy bullet is dangerously close.
+ *    - If enemy bullets are dangerously close (enemyBulletTooClose is true), the AI forces the shield and immediately
+ *      rotates away from the bullet threat using the computed repulsion vector, applies reverse thrust, and returns.
+ *
+ * 4. Offensive Engagement:
+ *    - If no dangerous bullet is present and a target exists, the desired angle is computed using:
+ *         desired_angle = atan2(target->y - player->y, target->x - player->x) * (180/π) + 180
+ *      so that when drawn (using (player->angle - 90)) the ship’s tip (model point (0, -size)) points toward the target.
+ *    - The AI rotates toward that angle at OFFENSIVE_ROTATION_SPEED.
+ *    - If the target is far (distance > SHOOTING_RANGE) and nearly aligned (angle difference < 10°), thrust is applied.
+ *      If within range, the ship brakes to stabilize before shooting.
+ *    - If aligned within 5° and within range, a bullet is fired from the ship’s tip.
+ *
+ * Note: CENTER_BONUS is currently logged for potential future use.
+ */
+
+void dev_ai_control(Player *player, Enemy enemies[], BulletPool *bulletPool, int screen_width, int screen_height) {
+
+    // AI parameters.
+    const float SHOOTING_RANGE            = 300.0f;
+    const float DANGER_DISTANCE           = 80.0f;
+    const float SHIELD_DISTANCE           = 50.0f;
+    const float BULLET_DANGER_DISTANCE    = 150.0f;  // Increased danger distance for bullets.
+    const float BULLET_REPULSION_FACTOR   = 3.0f;    // Scale factor for bullet repulsion.
+
+    float best_distance = 1e9;
+    Enemy *target = NULL;
+    float repulsion_x = 0.0f, repulsion_y = 0.0f;
+    int enemyBulletTooClose = 0;  // Flag to indicate dangerous enemy bullets.
+
+    // Calculate camera origin.
+    float cam_x = player->x - screen_width / 2.0f;
+    float cam_y = player->y - screen_height / 2.0f;
+
+    // Evaluate all active enemies.
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!enemies[i].active)
+            continue;
+        float dx = enemies[i].x - player->x;
+        float dy = enemies[i].y - player->y;
+        float distance = sqrtf(dx * dx + dy * dy);
+
+        // Compute enemy's screen position.
+        float enemy_screen_x = enemies[i].x - cam_x;
+        float enemy_screen_y = enemies[i].y - cam_y;
+        if (enemy_screen_x < -50 || enemy_screen_x > screen_width + 50 ||
+            enemy_screen_y < -50 || enemy_screen_y > screen_height + 50) {
+            DEBUG_PRINT(1, 2, "Enemy %d: offscreen (screen pos: %.2f, %.2f), skipped", i, enemy_screen_x, enemy_screen_y);
+            continue;
+        }
+        float center_dx = enemy_screen_x - screen_width / 2.0f;
+        float center_dy = enemy_screen_y - screen_height / 2.0f;
+        float screen_dist = sqrtf(center_dx * center_dx + center_dy * center_dy);
+        DEBUG_PRINT(1, 2, "Enemy %d: distance=%.2f, screen pos=(%.2f, %.2f), center_dist=%.2f", i, distance, enemy_screen_x, enemy_screen_y, screen_dist);
+
+        if (distance < best_distance) {
+            best_distance = distance;
+            target = &enemies[i];
+            DEBUG_PRINT(1, 2, "New target selected: enemy %d, distance=%.2f", i, distance);
+        }
+        if (distance < DANGER_DISTANCE) {
+            repulsion_x -= (dx / distance) * (DANGER_DISTANCE - distance);
+            repulsion_y -= (dy / distance) * (DANGER_DISTANCE - distance);
+            DEBUG_PRINT(1, 2, "Enemy %d: repulsion added (%.2f, %.2f)", i, repulsion_x, repulsion_y);
+        }
+    }
+
+    // Evaluate enemy bullets.
+    for (int i = 0; i < bulletPool->count; i++) {
+        if (bulletPool->bullets[i].active && bulletPool->bullets[i].isEnemy == 1) {
+            float bx = bulletPool->bullets[i].x - player->x;
+            float by = bulletPool->bullets[i].y - player->y;
+            float bdist = sqrtf(bx * bx + by * by);
+            DEBUG_PRINT(1, 2, "Enemy bullet %d: bdist=%.2f", i, bdist);
+            if (bdist < BULLET_DANGER_DISTANCE) {
+                enemyBulletTooClose = 1;
+                repulsion_x -= (bx / bdist) * (BULLET_DANGER_DISTANCE - bdist) * BULLET_REPULSION_FACTOR;
+                repulsion_y -= (by / bdist) * (BULLET_DANGER_DISTANCE - bdist) * BULLET_REPULSION_FACTOR;
+                DEBUG_PRINT(1, 2, "Enemy bullet %d: repulsion added (%.2f, %.2f)", i, repulsion_x, repulsion_y);
+            }
+        }
+    }
+    if (enemyBulletTooClose) {
+        DEBUG_PRINT(1, 3, "Enemy bullets are dangerously close; forcing shield activation and bullet evasion.");
+        activate_shield(player, 1);
+        // Evasion for bullets takes precedence: rotate away from bullet threat.
+        float flee_angle = atan2f(repulsion_y, repulsion_x) * (180.0f / M_PI) + 90.0f;
+        float angle_adjust = flee_angle - player->angle;
+        while (angle_adjust > 180.0f) angle_adjust -= 360.0f;
+        while (angle_adjust < -180.0f) angle_adjust += 360.0f;
+        DEBUG_PRINT(1, 2, "Bullet Evasion: flee_angle=%.2f, angle_adjust=%.2f", flee_angle, angle_adjust);
+        if (fabs(angle_adjust) < AI_EVASION_ROTATION_SPEED)
+            player->angle = flee_angle;
+        else if (angle_adjust > 0)
+            player->angle += AI_EVASION_ROTATION_SPEED;
+        else
+            player->angle -= AI_EVASION_ROTATION_SPEED;
+        DEBUG_PRINT(1, 3, "Bullet Evasion: new angle=%.2f", player->angle);
+        reverse_thrust(player);
+        DEBUG_PRINT(1, 3, "Bullet Evasion: applying reverse thrust");
+        return; // Do not continue offensive behavior while bullets are too close.
+    }
+
+    // Shield activation based on enemy target (if no dangerous bullets).
+    if (target != NULL) {
+        float dx = target->x - player->x;
+        float dy = target->y - player->y;
+        float dist = sqrtf(dx * dx + dy * dy);
+        DEBUG_PRINT(1, 2, "Target distance for shield check: %.2f", dist);
+        if (dist < SHIELD_DISTANCE) {
+            activate_shield(player, 1);
+            DEBUG_PRINT(1, 3, "Shield activated (target distance %.2f < %.2f)", dist, SHIELD_DISTANCE);
+        } else {
+            activate_shield(player, 0);
+            DEBUG_PRINT(1, 3, "Shield deactivated (target distance %.2f >= %.2f)", dist, SHIELD_DISTANCE);
+        }
+    } else {
+        activate_shield(player, 0);
+        DEBUG_PRINT(1, 3, "No target found; shield deactivated");
+    }
+    
+    // Evasion from enemy repulsion (if any remains after bullet evasion).
+    if (fabs(repulsion_x) > 0.01f || fabs(repulsion_y) > 0.01f) {
+        float flee_angle = atan2f(repulsion_y, repulsion_x) * (180.0f / M_PI) + 90.0f;
+        float angle_adjust = flee_angle - player->angle;
+        while (angle_adjust > 180.0f) angle_adjust -= 360.0f;
+        while (angle_adjust < -180.0f) angle_adjust += 360.0f;
+        DEBUG_PRINT(1, 2, "Evasion (enemies): flee_angle=%.2f, angle_adjust=%.2f", flee_angle, angle_adjust);
+        if (fabs(angle_adjust) < AI_EVASION_ROTATION_SPEED)
+            player->angle = flee_angle;
+        else if (angle_adjust > 0)
+            player->angle += AI_EVASION_ROTATION_SPEED;
+        else
+            player->angle -= AI_EVASION_ROTATION_SPEED;
+        DEBUG_PRINT(1, 3, "Evasion (enemies): new angle=%.2f", player->angle);
+        reverse_thrust(player);
+        DEBUG_PRINT(1, 3, "Evasion (enemies): applying reverse thrust");
+        return; // Evasion takes precedence.
+    }
+    
+    // Offensive engagement.
+    if (target != NULL) {
+        float desired_angle = atan2f(target->y - player->y, target->x - player->x) * (180.0f / M_PI) + 180.0f;
+        float angle_adjust = desired_angle - player->angle;
+        while (angle_adjust > 180.0f) angle_adjust -= 360.0f;
+        while (angle_adjust < -180.0f) angle_adjust += 360.0f;
+        DEBUG_PRINT(1, 2, "Offense: desired_angle=%.2f, angle_adjust=%.2f", desired_angle, angle_adjust);
+        if (fabs(angle_adjust) < AI_OFFENSIVE_ROTATION_SPEED)
+            player->angle = desired_angle;
+        else if (angle_adjust > 0)
+            player->angle += AI_OFFENSIVE_ROTATION_SPEED;
+        else
+            player->angle -= AI_OFFENSIVE_ROTATION_SPEED;
+        DEBUG_PRINT(1, 3, "Offense: new angle=%.2f", player->angle);
+    
+        float dx = target->x - player->x;
+        float dy = target->y - player->y;
+        float distance = sqrtf(dx * dx + dy * dy);
+        DEBUG_PRINT(1, 2, "Offense: distance to target = %.2f", distance);
+        
+        if (distance > SHOOTING_RANGE) {
+            if (fabs(angle_adjust) < 10.0f) {
+                thrust_player(player);
+                DEBUG_PRINT(1, 3, "Offense: enemy far and aligned, applying thrust to approach");
+            } else {
+                DEBUG_PRINT(1, 3, "Offense: enemy far but not aligned (angle_adjust=%.2f), no thrust", angle_adjust);
+            }
+        } else {
+            player->vx *= 0.8f;
+            player->vy *= 0.8f;
+            DEBUG_PRINT(1, 3, "Offense: enemy within shooting range, braking to stabilize");
+        }
+    
+        if (fabs(angle_adjust) < 5.0f && distance <= SHOOTING_RANGE) {
+            float tip_x, tip_y;
+            get_ship_tip(player, &tip_x, &tip_y);
+            shoot_bullet(bulletPool, tip_x, tip_y, player->angle, 0);
+            DEBUG_PRINT(1, 3, "Offense: aligned (angle_adjust=%.2f) and within range, shooting", angle_adjust);
+        } else {
+            DEBUG_PRINT(1, 2, "Offense: not shooting (angle_adjust=%.2f, distance=%.2f)", angle_adjust, distance);
+        }
+    } else {
+        DEBUG_PRINT(1, 3, "No target detected: remaining stationary");
+    }
 }
 
 // Prompt the user for a username via the SDL window.
@@ -178,22 +382,44 @@ void game_loop() {
     }
 
     // Get or prompt username.
-    char *username = load_username();
-    if (!username) {
-        username = prompt_username(renderer, font, screen_width, screen_height);
-        if (!username)
-            username = strdup("default");
-        save_username(username);
+    char *orig_username = load_username();
+    if (!orig_username) {
+        orig_username = prompt_username(renderer, font, screen_width, screen_height);
+        if (!orig_username)
+            orig_username = strdup("default");
+        save_username(orig_username);
     }
-    if (!ensure_keypair(username)) {
-        DEBUG_PRINT(2, 0, "Key pair generation failed for user %s", username);
+    if (!ensure_keypair(orig_username)) {
+        DEBUG_PRINT(2, 0, "Key pair generation failed for user %s", orig_username);
     }
-    DEBUG_PRINT(2, 3, "Starting game with username: %s", username);
+    DEBUG_PRINT(2, 3, "Starting game with username: %s", orig_username);
+
+    char *username = NULL;
+    if (g_dev_auto_mode) {
+        // Append "DevAI" 
+        username = malloc(strlen(orig_username) + 6); // "DevAi" (5) + '\0' (1)
+        if (username) {
+            strcpy(username, orig_username);
+            strcat(username, "DevAI");
+        } else {
+            username = strdup(orig_username);
+        }
+        free(orig_username);
+    } else {
+        // not in dev auto mode. DONT DEREFERENCE A NULL POINTER
+        username = orig_username;
+    }
 
     // Initialize game objects.
     Player player;
     init_player(&player, screen_width, screen_height);
-    
+    if (g_dev_auto_mode) {
+        player.health = AI_DEFAULT_HEALTH; 
+        player.energy = AI_DEFAULT_ENERGY;
+        DEBUG_PRINT(1, 3, "AI energy overridden to %f", player.energy);
+        DEBUG_PRINT(1, 3, "AI health overridden to %d", player.health);
+    }
+
     BulletPool bulletPool;
     init_bullet_pool(&bulletPool);
     
@@ -228,55 +454,72 @@ void game_loop() {
         float speedMultiplier = (keystate[SDL_SCANCODE_LCTRL] || keystate[SDL_SCANCODE_RCTRL]) ? 2.0f : 1.0f;
         
         // Player controls:
-        if (keystate[SDL_SCANCODE_LEFT])
-            rotate_player(&player, -2 * speedMultiplier);
-        if (keystate[SDL_SCANCODE_RIGHT])
-            rotate_player(&player, 2 * speedMultiplier);
-        // Ship sizing keys:
-        if (keystate[SDL_SCANCODE_DOWN])
-            decrease_ship_size(&player);
-        if (keystate[SDL_SCANCODE_UP])
-            increase_ship_size(&player);
-        if (keystate[SDL_SCANCODE_RSHIFT])
-            reset_ship_size(&player);
-        if (keystate[SDL_SCANCODE_W])
-            thrust_player(&player);
-        if (keystate[SDL_SCANCODE_S])
-            reverse_thrust(&player);
-        if (keystate[SDL_SCANCODE_A])
-            strafe_left(&player);
-        if (keystate[SDL_SCANCODE_D])
-            strafe_right(&player);
-        if (keystate[SDL_SCANCODE_SPACE]) {
-            float tip_x, tip_y;
-            get_ship_tip(&player, &tip_x, &tip_y);
-            shoot_bullet(&bulletPool, tip_x, tip_y, player.angle, 0); // 0: player's bullet
+        if (!g_dev_auto_mode) {
+            if (keystate[SDL_SCANCODE_LEFT])
+                rotate_player(&player, -2 * speedMultiplier);
+            if (keystate[SDL_SCANCODE_RIGHT])
+                rotate_player(&player, 2 * speedMultiplier);
+            // Ship sizing keys:
+            if (keystate[SDL_SCANCODE_DOWN])
+                decrease_ship_size(&player);
+            if (keystate[SDL_SCANCODE_UP])
+                increase_ship_size(&player);
+            if (keystate[SDL_SCANCODE_RSHIFT])
+                reset_ship_size(&player);
+            if (keystate[SDL_SCANCODE_W])
+                thrust_player(&player);
+            if (keystate[SDL_SCANCODE_S])
+                reverse_thrust(&player);
+            if (keystate[SDL_SCANCODE_A])
+                strafe_left(&player);
+            if (keystate[SDL_SCANCODE_D])
+                strafe_right(&player);
+            if (keystate[SDL_SCANCODE_SPACE]) {
+                float tip_x, tip_y;
+                get_ship_tip(&player, &tip_x, &tip_y);
+                shoot_bullet(&bulletPool, tip_x, tip_y, player.angle, 0); // 0: player's bullet
+            }
+            if (keystate[SDL_SCANCODE_E])
+                activate_shield(&player, 1);
+            else
+                activate_shield(&player, 0);
+        } else {
+            // In dev auto mode 
+            DEBUG_PRINT(2, 2, "Entering dev_ai_control (screen %dx%d)", screen_width, screen_height);
+            dev_ai_control(&player, enemies, &bulletPool, screen_width, screen_height);
         }
-        if (keystate[SDL_SCANCODE_E])
-            activate_shield(&player, 1);
-        else
-            activate_shield(&player, 0);
         
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT)
                 running = 0;
             else if (e.type == SDL_KEYDOWN &&
                      (e.key.keysym.sym == SDLK_ESCAPE || e.key.keysym.sym == SDLK_q)) {
-                player.health = 0;
-                DEBUG_PRINT(2, 0, "Q or Escape pressed. Game ended");
+                // Call pause menu.
+                extern int pause_menu(SDL_Renderer*, TTF_Font*, int, int);
+                int resume = pause_menu(renderer, font, screen_width, screen_height);
+                if (!resume) {
+                    player.health = 0;
+                    DEBUG_PRINT(2, 0, "Quit selected from apuse menu. Game ended");
+                } else {
+                    DEBUG_PRINT(2, 3, "Resume selected from pause menu");
+                }
             }
         }
         
         // Update game objects.
         update_player(&player);
+        wrap_player_position(&player);
         update_shield_energy(&player);
         update_bullets(&bulletPool);
         
         float baseRate = 0.5f;
         float rateIncrease = score / 500.0f;
         float desiredSpawnRate = baseRate + rateIncrease;
-        if (desiredSpawnRate > 10.0f)
-            desiredSpawnRate = 10.0f;
+        if (g_dev_auto_mode) {
+            desiredSpawnRate *= AI_PROGRESS_MULTIPLIER;
+        }
+        if (desiredSpawnRate > 15.0f)
+            desiredSpawnRate = 15.0f;
         float spawnIntervalSeconds = 1.0f / desiredSpawnRate;
         int spawnIntervalFrames = (int)(spawnIntervalSeconds / (FRAME_DELAY / 1000.0f));
         
@@ -287,21 +530,8 @@ void game_loop() {
             DEBUG_PRINT(3, 2, "Enemy spawned; spawnTimer reset");
         }
         
-        float diffScale = 1.0f + ((score > 5000 ? 5000 : score) / 1000.0f);
+        float diffScale = 1.0f + (((score > 5000 ? 5000 : score) / 1000.0f)) * (g_dev_auto_mode ? AI_PROGRESS_MULTIPLIER : 1.0f);
         update_enemies(enemies, player.x, player.y, diffScale, &bulletPool);
-        
-        // Enemy shooting: For shooter-type enemies, if within range and shoot timer expired, fire enemy bullet.
-        //for (int i = 0; i < MAX_ENEMIES; i++) {
-        //    if (enemies[i].active && enemies[i].type == ENEMY_SHOOTER) {
-        //        float dx = player.x - enemies[i].x;
-        //        float dy = player.y - enemies[i].y;
-        //        float distance = sqrtf(dx * dx + dy * dy);
-        //        if (distance < 300 && enemies[i].shootTimer <= 0) {
-        //            enemy_shoot(&enemies[i], &bulletPool, player.x, player.y);
-        //            enemies[i].shootTimer = 120;
-        //        }
-        //    }
-        //}
         
         // Process collisions between player's bullets and enemies.
         for (int i = 0; i < bulletPool.count; i++) {
@@ -312,9 +542,11 @@ void game_loop() {
                         float dy = bulletPool.bullets[i].y - enemies[j].y;
                         float dist = sqrtf(dx * dx + dy * dy);
                         if (dist < 15) {
-                            enemies[j].health -= 1;
-                            bulletPool.bullets[i].active = 0;
+                            enemies[j].health -= bulletPool.bullets[i].damage;
                             DEBUG_PRINT(3, 2, "Player bullet hit enemy %d; new health = %d", j, enemies[j].health);
+                            if (!(g_dev_auto_mode && AI_PIERCING_SHOT)) {
+                                bulletPool.bullets[i].active = 0;
+                            }
                             if (enemies[j].health <= 0) {
                                 for (int k = 0; k < MAX_EXPLOSIONS; k++) {
                                     if (explosions[k].lifetime <= 0) {
@@ -346,7 +578,7 @@ void game_loop() {
                         player.health -= 1;
                         shakeTimer = 20;
                         shakeMagnitude = 10.0f;
-                        DEBUG_PRINT(3, 0, "Player hit by enemy bullet; health reduced to %d", player.health);
+                        DEBUG_PRINT(3, 2, "Player hit by enemy bullet; health reduced to %d", player.health);
                     } else {
                         DEBUG_PRINT(3, 2, "Enemy bullet blocked by shield.");
                     }
@@ -366,7 +598,7 @@ void game_loop() {
                         player.health -= 1;
                         shakeTimer = 20;
                         shakeMagnitude = 10.0f;
-                        DEBUG_PRINT(3, 0, "Player hit by enemy %d; health reduced to %d", j, player.health);
+                        DEBUG_PRINT(3, 2, "Player hit by enemy %d; health reduced to %d", j, player.health);
                     }
                     enemies[j].active = 0;
                 }
@@ -442,8 +674,13 @@ void game_loop() {
         draw_background(renderer, cam_x, cam_y, screen_width, screen_height);
         SDL_Color white = {255, 255, 255, 255};
         char hud[200];
-        sprintf(hud, "Health: %d  Energy: %.1f  Score: %d  X: %.1f  Y: %.1f  Angle: %.1f", 
-                player.health, player.energy, score, player.x, player.y, player.angle);
+        if (g_dev_auto_mode) {
+            sprintf(hud, "Health: %d  Energy: %.1f  Score: %d  X: %.1f  Y: %.1f  Angle: %.1f", 
+                    player.health, player.energy, score, player.x, player.y, player.angle);
+        } else {
+            sprintf(hud, "Health: %d  Energy: %.1f  Score: %d  X: %.1f  Y: %.1f  Angle: %.1f",
+                    player.health, player.energy, score, player.x, player.y, player.angle);
+        }
         render_text(renderer, font, 10, 10, hud, white);
         draw_bullets(&bulletPool, renderer, cam_x, cam_y);
         draw_enemies(enemies, renderer, cam_x, cam_y);
@@ -461,6 +698,9 @@ void game_loop() {
         
         SDL_RenderPresent(renderer);
         SDL_Delay(FRAME_DELAY);
+        if (g_exit_requested) {
+            player.health = 0;
+        }
     }
     
     free_bullet_pool(&bulletPool);

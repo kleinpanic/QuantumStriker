@@ -10,7 +10,24 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Helper function for enemy shooter to fire at the player.
+#define COLLISION_MARGIN 5.0f
+
+static float get_collision_radius(EnemyType type) {
+    switch (type) {
+        case ENEMY_BASIC:     return 15.0f;
+        case ENEMY_SHOOTER:   return 15.0f;
+        case ENEMY_TANK:      return 20.0f;
+        case ENEMY_EVASIVE:   return 15.0f;
+        case ENEMY_FAST:      return 10.0f;
+        case ENEMY_SPLITTER:  return 12.0f;
+        case ENEMY_STEALTH:   return 15.0f;
+        case ENEMY_BOSS1:     return 30.0f;
+        case ENEMY_BOSS2:     return 28.0f;
+        case ENEMY_BOSS3:     return 32.0f;
+        default:              return 15.0f;
+    }
+}
+
 void enemy_shoot(Enemy *enemy, BulletPool *pool, float player_x, float player_y) {
     float dx = player_x - enemy->x;
     float dy = player_y - enemy->y;
@@ -44,7 +61,7 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
         float diff_y = player_y - enemies[i].y;
         float distance = sqrtf(diff_x * diff_x + diff_y * diff_y);
         float moveStep;
-        // Increase the timer for enemy AI
+        // Increase the timer for enemy AI.
         enemies[i].timer++;
 
         switch (enemies[i].type) {
@@ -179,6 +196,30 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
         }
         DEBUG_PRINT(3, 2, "Updated enemy (type %d) at (%.2f, %.2f), distance=%.2f", enemies[i].type, enemies[i].x, enemies[i].y, distance);
     }
+    // Resolve collisions between all active enemies.
+    // For each pair, compute a minimum separation based on each enemy's collision radius plus a margin.
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!enemies[i].active) continue;
+        float radius_i = get_collision_radius(enemies[i].type);
+        for (int j = i + 1; j < MAX_ENEMIES; j++) {
+            if (!enemies[j].active) continue;
+            float radius_j = get_collision_radius(enemies[j].type);
+            float minSeparation = radius_i + radius_j + COLLISION_MARGIN;
+            float dx = enemies[j].x - enemies[i].x;
+            float dy = enemies[j].y - enemies[i].y;
+            float dist = sqrtf(dx * dx + dy * dy);
+            if (dist < minSeparation && dist > 0.0f) {
+                float overlap = minSeparation - dist;
+                float nx = dx / dist;
+                float ny = dy / dist;
+                enemies[i].x -= nx * (overlap * 0.5f);
+                enemies[i].y -= ny * (overlap * 0.5f);
+                enemies[j].x += nx * (overlap * 0.5f);
+                enemies[j].y += ny * (overlap * 0.5f);
+                DEBUG_PRINT(3, 3, "Resolved collision between enemy %d and enemy %d; overlap=%.2f", i, j, overlap);
+            }
+        }
+    }
 }
 
 // Draw enemies with different shapes/colors based on type.
@@ -198,12 +239,9 @@ void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float ca
                 filledEllipseRGBA(renderer, cx, cy, 15, 10, 255, 0, 0, 255);
                 break;
             case ENEMY_SHOOTER: {
-                // Draw a rotated rectangle to represent the shooter enemy.
-                // Rectangle dimensions: 24x16 (half-width = 12, half-height = 8).
                 const float halfWidth = 12.0f;
                 const float halfHeight = 8.0f;
                 float rad = enemies[i].angle * (M_PI / 180.0f);
-                // Define the four corners of the rectangle in local space.
                 float local[4][2] = {
                     { -halfWidth, -halfHeight },
                     {  halfWidth, -halfHeight },
@@ -212,7 +250,6 @@ void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float ca
                 };
                 Sint16 vx[4], vy[4];
                 for (int j = 0; j < 4; j++) {
-                    // Rotate the local point and translate to screen position.
                     float rx = local[j][0] * cos(rad) - local[j][1] * sin(rad);
                     float ry = local[j][0] * sin(rad) + local[j][1] * cos(rad);
                     vx[j] = cx + (int)rx;
@@ -268,7 +305,6 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score) {
             enemies[i].x = player_x + cosf(angle) * distance;
             enemies[i].y = player_y + sinf(angle) * distance;
             int r = rand() % 100;
-            // Determine enemy type based on score thresholds.
             if (score < 100) {
                 enemies[i].type = ENEMY_BASIC;
             } else if (score < 500) {
@@ -316,7 +352,6 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score) {
                     enemies[i].type = ENEMY_BOSS3;
             }
 
-            // Set health based on type.
             switch (enemies[i].type) {
                 case ENEMY_BASIC: enemies[i].health = 3; break;
                 case ENEMY_SHOOTER: enemies[i].health = 3; enemies[i].shootTimer = 120; break;
@@ -339,4 +374,3 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score) {
         }
     }
 }
-

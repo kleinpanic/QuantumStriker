@@ -6,6 +6,7 @@
 /* Global flag and level – set from main */
 extern int g_debug_enabled;   // 0 = off, 1 = on
 extern int g_debug_level;     // expected values 1, 2, or 3
+extern int g_always_print; // Always print message that use detail level 0. 
 
 /* ANSI color codes for printing */
 #define DEBUG_COLOR_ERROR   "\033[31m"  // red
@@ -17,8 +18,9 @@ extern int g_debug_level;     // expected values 1, 2, or 3
 /*
  * DEBUG_PRINT(detail, severity, fmt, ...)
  *
- * detail: an integer (1-3) that tags the “depth” of the debug statement.
+ * detail: an integer (0-3) that tags the “depth” of the debug statement.
  *         Only debug statements whose detail equals g_debug_level will print.
+ *         0 - will always print the statement regardless of detail or severity. 
  *
  * severity: a status code:
  *    0 = error/critical (always printed, in red)
@@ -30,18 +32,21 @@ extern int g_debug_level;     // expected values 1, 2, or 3
  *
  * By default (when g_debug_enabled==0) only severity 0 messages are printed.
  */
-#define DEBUG_PRINT(detail, severity, fmt, ...)                \
-    do {                                                       \
-        if ((severity) == 0 || (g_debug_enabled && (g_debug_level) == (detail))) { \
-            const char* color = "";                            \
-            if ((severity) == 0) { color = DEBUG_COLOR_ERROR; }\
-            else if ((severity) == 1) { color = DEBUG_COLOR_WARNING; }\
-            else if ((severity) == 2) { color = DEBUG_COLOR_DEBUG; }\
-            else if ((severity) == 3) { color = DEBUG_COLOR_SUCCESS; }\
-            fprintf(stderr, "%s", color);                      \
-            fprintf(stderr, fmt, ##__VA_ARGS__);               \
-            fprintf(stderr, "%s\n", DEBUG_COLOR_RESET);        \
-        }                                                      \
+
+#define DEBUG_PRINT(detail, severity, fmt, ...)                             \
+    do {                                                                    \
+        if ((severity) == 0 ||                                             \
+            (((detail) == 0) && g_always_print) ||                           \
+            (g_debug_enabled && (g_debug_level) == (detail))) {              \
+            const char* color = "";                                         \
+            if ((severity) == 0) { color = DEBUG_COLOR_ERROR; }             \
+            else if ((severity) == 1) { color = DEBUG_COLOR_WARNING; }        \
+            else if ((severity) == 2) { color = DEBUG_COLOR_DEBUG; }          \
+            else if ((severity) == 3) { color = DEBUG_COLOR_SUCCESS; }        \
+            fprintf(stderr, "%s", color);                                   \
+            fprintf(stderr, fmt, ##__VA_ARGS__);                            \
+            fprintf(stderr, "%s\n", DEBUG_COLOR_RESET);                     \
+        }                                                                   \
     } while(0)
 
 #endif /* DEBUG_H */

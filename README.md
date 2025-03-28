@@ -12,7 +12,8 @@
 <!-- TOP_SCORES_START -->
 | Rank | Username           | Score | Timestamp |
 |------|--------------------|-------|-----------|
-| 1    | kleinpanic         | 2585  | 2025-03-26 12:02:08 |
+| 1    | kleinpanicDevAI    | 5267  | 2025-03-27 22:51:48 |
+| 2    | kleinpanic         | 2585  | 2025-03-26 12:02:08 |
 <!-- TOP_SCORES_END -->
 
 <!-- CHEATERS_START -->
@@ -66,7 +67,7 @@ Ensure you have installed:
 On Debian/Ubuntu, install with:
 
 ```bash
-sudo apt-get install build-essential libsdl2-dev libsdl2-ttf-dev libsdl2-gfx-dev
+sudo apt-get install build-essential libssl-dev libsdl2-dev libsdl2-ttf-dev libsdl2-gfx-dev
 ```
 
 ### Building

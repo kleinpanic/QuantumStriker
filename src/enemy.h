@@ -4,8 +4,7 @@
 #include "bullet.h"  // Needed for the BulletPool type.
 #include <SDL2/SDL.h>
 #include "debug.h"
-
-#define MAX_ENEMIES 100
+#include "config.h"
 
 // Define 10 enemy types (7 regular + 3 bosses)
 typedef enum {

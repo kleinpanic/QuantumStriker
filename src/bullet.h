@@ -9,6 +9,8 @@ typedef struct {
     float dx, dy;
     int active;
     int isEnemy;  // 0 = player's bullet, 1 = enemy bullet
+    int damage;
+    float spawn_x, spawn_y;
 } Bullet;
 
 typedef struct {

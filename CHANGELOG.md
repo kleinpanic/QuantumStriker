@@ -250,6 +250,7 @@ Below is a changelog entry for version **0.1.8** that encapsulates all the enhan
 ### Changed
 - Refactored enemy spawn and update logic to integrate the new AI behaviors and visual effects while maintaining full compatibility with previous features (including blockchain-backed high score submission and in‑game UI).
 - Updated debug logging across modules to provide clearer insights into gameplay and AI behavior.
+- Changed config.h and config.c to add a 0 integrer that will cause printing regardless of the severity or --debug option. 
 
 ---
 

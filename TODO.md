@@ -1,5 +1,9 @@
 # TODO
 
+## Misc
+- [ ] Update TODO. Update README. Update all docs. Possible explore private py file to connect to server for autoupdate w/ ollama.
+- [X] use a better hashing algorithm for the background.
+
 ## High Score Authentication & Leaderboards
 
 - [X] Replace plaintext high score files with PGP-signed or otherwise tamper-resistant storage to ensure scores are achieved authentically.
@@ -42,13 +46,15 @@
 
 - [X] Implement multiple enemy types with unique behaviors (e.g., enemies that shoot back, faster enemies).
 - [ ] Enhance Enemy AI
+- [X] Handle Inter Enemy Collisions
+- [ ] Improve inter enemy collisions for when there is a lot of enemies. 
 - [ ] Scale enemy difficulty further as the score increases (including health, speed, and spawn frequency).
 - [ ] Introduce advanced enemy strategies such as coordinated attacks and evasive maneuvers.
 
 ## User Interface Improvements
 
 - [ ] Refine the dynamic background with additional galactic elements (e.g., more stars, varied planet types, animated cosmic effects).
-- [ ] Make the game more space-realistic (maybe like add black holes, avoid planets, etc)
+- [ ] Add game physics to allow interactions w/ galatic objects
 - [ ] Improve HUD visuals and animations (e.g., smoother transitions, real-time FPS display in debug mode).
 - [X] Implement a graphical username prompt within the game window (instead of terminal input).
 - [X] Implement a shake feature when user takes damage
@@ -56,6 +62,7 @@
 - [ ] implement a settings screen.
 - [ ] Implemenet a screen to load a game or a screen option after the start option.
 - [ ] Make a prettier Ui for the username entry section
+- [X] Add pause mechanism
 - [ ] Make the Game UI itself prettier with the user information
 
 ## Input and Control Enhancements
@@ -89,9 +96,8 @@
 - [ ] Improve `--debug` flag by adding a mechanism for level 3 that would add more info about like which file the error is occuring in [either defined by an internal variable or a hasmap in debug.h that needs to be maintained]. Additionally every debug should have 3 debugs for each level. Improve debugging.
 - [X] Add a `--fullscreen` flag to launch the game in fullscreen mode (to be implemented).
 - [ ] add a `--resizeable` flag to launch the game in a resizeable manner. Or have this just be a default implementation.
-- [ ] Add a `--testing` flag and a `--development` flag for testing the program and stress testing it and edge casing it.
-    - Development flag would allow for a "cheated" mode that contributes to a fake blockchain that isn't pushed but is used to test the full features of the program and make sure its production ready. So for instance, I wouldn't die, i could set the score to whatever i wanted, i can spawn enemies, I can teleport, I want an option to have the game be played by an AI for me to just stress test the game and its resource intensity over time, and for other reasons, maybe also seperate this into its on --ai flag.  
-    - --testing flag would be for stress testing in other aspects. Not sure how this would differ from --development flag, but maybe this would used for more edge cases, running unit tests, seeing if they all pass, allowing an automated issues creation option maybe?
+- [X] Add a `--testing` flag and a `--development` flag for testing the program and stress testing it and edge casing it.
+- [ ] further develop --development and testing flag
 - [X] Add a `--highscores` flag to display a table of all high scores.
 - [ ] Add a `--config` flag to perminently change configurations from the command line
     - CLi equivalent of the settings button i wanna add to with the start menu. also need to add config file and configuration reading, and maybe use these configs in the blockchain for that standardization / inspection i was talking about [future improvement could be a dynamic weighted algorithm that determines top users based on the configurations like enemy speed, user speed, infinite bullets, maybe if there is a bullet cooldown, etc] 

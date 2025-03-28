@@ -14,11 +14,20 @@ int g_dev_auto_mode = 0;
 #include <sys/stat.h>
 #include <sys/types.h>
 
+volatile sig_atomic_t g_exit_requested = 0;
+
+void handle_sigint(int sig) {
+    (void)sig; // Unused parameter.
+    g_exit_requested = 1;
+    DEBUG_PRINT(0, 3, "SIGINT received: exiting game loop");
+}
+
 int main(int argc, char *argv[]) {
+    signal(SIGINT, handle_sigint);
     // Process command-line arguments.
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--version") == 0) {
-            DEBUG_PRINT(2, 3, "Version flag activated.");
+            DEBUG_PRINT(0, 3, "Version flag activated.");
             DEBUG_PRINT(3, 3, "Version flag activated. Version number will be read from version.h file, and status will return 0");
             printf("Quantum Striker Version %s\n", QUANTUM_STRIKER_VERSION);
             return 0;
@@ -29,7 +38,7 @@ int main(int argc, char *argv[]) {
             printf("  --version    Print the version number\n");
             printf("  --help       Show this help message\n");
             printf("  --debug      Enable debug mode with a level (1-3)\n");
-            printf("  --fullscreen Fullscreen mode (feature to be implemented later)\n");
+            printf("  --fullscreen Fullscreen mode \n");
             printf("  --highscores Display a table of all high scores\n");
             return 0;
         } else if (strcmp(argv[i], "--debug") == 0) {
@@ -47,47 +56,33 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "--fullscreen") == 0) {
 
             g_fullscreen = 1;
-            DEBUG_PRINT(1, 3, "Fullscreen flag activated.");
-            DEBUG_PRINT(2, 3, "Fullscreen flag activated.");
-            DEBUG_PRINT(3, 3, "Fullscreen flag activated by user thru --fullscreen flag.");
+            DEBUG_PRINT(0, 3, "Fullscreen flag activated.");
         } else if (strcmp(argv[i], "--highscores") == 0) {
-            DEBUG_PRINT(2, 3, "Highscores flag active");
-            DIR *dir = opendir("highscore");
-            if (!dir) {
-                printf("No highscore directory found.\n");
-                return 0;
-            }
-            printf("+----------------------+------------+\n");
-            printf("| Username             | High Score |\n");
-            printf("+----------------------+------------+\n");
-            struct dirent *entry;
-            char filepath[512];
-            while ((entry = readdir(dir)) != NULL) {
-                if (strstr(entry->d_name, "_highscore.txt") != NULL) {
-                    char *suffix = strstr(entry->d_name, "_highscore.txt");
-                    size_t len = suffix - entry->d_name;
-                    char username[101] = {0};
-                    strncpy(username, entry->d_name, len);
-                    username[len] = '\0';
-                    snprintf(filepath, sizeof(filepath), "highscore/%s", entry->d_name);
-                    FILE *file = fopen(filepath, "r");
-                    int hs = 0;
-                    if (file) {
-                        fscanf(file, "%d", &hs);
-                        fclose(file);
-                    }
-                    printf("| %-20s | %10d |\n", username, hs);
+            #include "highscores.h"
+            display_highscores();
+            return 0;
+        } else if (strcmp(argv[i], "--development") == 0) {
+            // Check if a Sub-argument is provided. 
+            if (i + 1 >= argc) {
+                DEBUG_PRINT(0, 1, "Usage for --development:\n");
+                DEBUG_PRINT(0, 1, "     auto: Enables automatic playstyle for dev mode\n.");
+                return 1;
+            } else {
+                // a subargument has been provided! yay
+                if (strcmp(argv[i+1], "auto") == 0) {
+                    g_dev_auto_mode = 1;
+                    DEBUG_PRINT(0, 3, "Development mode activated w/ auto option");
+                    i++; //skip the "auto" argument and continue
+                } else {
+                    // Invalide sub argument was passed. Print error
+                    DEBUG_PRINT(0, 1, "Invalid Usage of --development:\n");
+                    printf("unknown argument : '%s'\n", argv[i+1]);
+                    DEBUG_PRINT(0, 1, "Usage for --development:\n");
+                    DEBUG_PRINT(0, 1, "     auto: Enables automatic playstyle for dev mode\n.");
+                    return 1;
                 }
             }
-            printf("+----------------------+------------+\n");
-            closedir(dir);
-            return 0;
-        } if (strcmp(argv[i], "--development") == 0 && i + 1 < argc) {
-            if (strcmp(argv[i+1], "auto") == 0) {
-                g_dev_auto_mode = 1;
-            }
-            // Add more sub-flags as needed.
-        } if (strcmp(argv[i], "--testing") == 0) {
+        } else if (strcmp(argv[i], "--testing") == 0) {
             g_testing_mode = 1;
         } else {
             printf("Unknown option: %s\nTry '--help' for usage.\n", argv[i]);

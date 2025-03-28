@@ -1,5 +1,6 @@
 #include "player.h"
 #include "debug.h"
+#include "config.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
 #include <math.h>
@@ -7,14 +8,6 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-
-#define THRUST_ACCELERATION 0.5f
-#define DAMPING 0.99f
-#define MAX_SPEED 10.0f
-
-#define MAX_ENERGY 10.0f
-#define DEPLETION_RATE 0.02f
-#define REFILL_RATE 0.007f
 
 void init_player(Player *player, int screen_width, int screen_height) {
     (void)screen_width;
@@ -30,6 +23,19 @@ void init_player(Player *player, int screen_width, int screen_height) {
     player->size = DEFAULT_SHIP_SIZE;
     DEBUG_PRINT(2, 3, "Player initialized: pos=(%.2f, %.2f), angle=%.2f, health=%d, energy=%.2f, size=%.2f",
                 player->x, player->y, player->angle, player->health, player->energy, player->size);
+}
+
+void wrap_player_position(Player *player) {
+    float halfBorder = WORLD_BORDER / 2.0f;
+    if (player->x > halfBorder)
+        player->x = -halfBorder;
+    else if (player->x < -halfBorder)
+        player->x = halfBorder;
+    
+    if (player->y > halfBorder)
+        player->y = -halfBorder;
+    else if (player->y < -halfBorder)
+        player->y = halfBorder;
 }
 
 void rotate_player(Player *player, float angle_delta) {
@@ -88,9 +94,18 @@ void update_shield_energy(Player *player) {
             DEBUG_PRINT(3, 0, "Shield deactivated due to energy depletion");
         }
     } else {
-        if (player->energy < MAX_ENERGY) {
-            player->energy += REFILL_RATE;
-            if (player->energy > MAX_ENERGY) player->energy = MAX_ENERGY;
+        float refill = REFILL_RATE;
+        float max_energy = MAX_ENERGY;
+        if (g_dev_auto_mode) {
+            refill = AI_REFILL_RATE;
+            max_energy = AI_DEFAULT_ENERGY;
+        }
+        if (player->energy < max_energy) {
+            player->energy += refill;
+            if (player->energy > max_energy) player->energy = max_energy;
+            if (g_dev_auto_mode) {
+                if (player->energy < AI_MIN_ENERGY) player->energy = max_energy; 
+            }
         }
     }
     DEBUG_PRINT(3, 2, "Shield energy updated: energy=%.2f, shieldActive=%d",
