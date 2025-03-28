@@ -12,12 +12,8 @@
 <!-- TOP_SCORES_START -->
 | Rank | Username           | Score | Timestamp |
 |------|--------------------|-------|-----------|
-<<<<<<< HEAD
-| 1    | kleinpanicDevAI    | 5267  | 2025-03-27 22:51:48 |
-| 2    | kleinpanic         | 2585  | 2025-03-26 12:02:08 |
-=======
-| 1    | kleinpanic         | 2585  | 2025-03-26 16:02:08 |
->>>>>>> 289b1421301e803c1b37e3c38cd333ae95ab3309
+| 1    | kleinpanicDevAI    | 10930 | 2025-03-28 06:28:49 |
+| 2    | kleinpanic         | 2585  | 2025-03-26 16:02:08 |
 <!-- TOP_SCORES_END -->
 
 <!-- CHEATERS_START -->
