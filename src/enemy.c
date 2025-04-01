@@ -30,6 +30,48 @@ void enemy_shoot(Enemy *enemy, BulletPool *pool, float player_x, float player_y)
     DEBUG_PRINT(3, 2, "Enemy SHOOTER fired bullet towards player at angle %.2f", angle);
 }
 
+void split_enemy(Enemy enemies[], int index) {
+    // Only proceed if the enemy is indeed a splitter.
+    if (enemies[index].type != ENEMY_SPLITTER)
+        return;
+
+    // Use the splitter enemy's current angle as the base.
+    float baseAngle = enemies[index].angle;
+    float angle1 = baseAngle + 30.0f;
+    float angle2 = baseAngle - 30.0f;
+
+    // For each of the two new enemies:
+    for (int i = 0; i < 2; i++) {
+        int slot = -1;
+        // Find an inactive enemy slot.
+        for (int j = 0; j < MAX_ENEMIES; j++) {
+            if (!enemies[j].active) {
+                slot = j;
+                break;
+            }
+        }
+        if (slot == -1) {
+            DEBUG_PRINT(3, 2, "No free slot to spawn split enemy.");
+            break;
+        }
+        // Choose the angle for this new enemy.
+        float spawnAngle = (i == 0) ? angle1 : angle2;
+        // Generate a random offset distance between 10 and 15 units.
+        float offsetDistance = (25.0f + (rand() % 26)); // should return 10-20
+        // Calculate the spawn position offset from the splitter enemy's position.
+        enemies[slot].x = enemies[index].x + offsetDistance * cosf(spawnAngle * (M_PI / 180.0f));
+        enemies[slot].y = enemies[index].y + offsetDistance * sinf(spawnAngle * (M_PI / 180.0f));
+        enemies[slot].angle = spawnAngle;  // Face in the direction of the spawn.
+        enemies[slot].type = ENEMY_BASIC;  // Or change to a different type if desired.
+        enemies[slot].health = 3;          // Set health for a basic enemy.
+        enemies[slot].active = 1;
+        enemies[slot].timer = 0;
+        enemies[slot].visible = 1;
+        DEBUG_PRINT(3, 2, "Split enemy spawned in slot %d at (%.2f, %.2f)",
+                    slot, enemies[slot].x, enemies[slot].y);
+    }
+}
+
 static void rotate_toward(float *current, float target, float maxDelta) {
     float diff = target - *current;
     while (diff > 180.0f) diff -= 360.0f;
@@ -103,7 +145,7 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
                     enemies[i].angle += (angleDifference > 0 ? rotationSpeed : -rotationSpeed);
     
                 // Position adjustment to maintain target distance.
-float adjustment = 0.05f * fabs(distanceError) * difficulty;
+                float adjustment = 0.05f * fabs(distanceError) * difficulty;
                 float norm = (distance > 0) ? distance : 1.0f;
                 float unit_dx = diff_x / norm;
                 float unit_dy = diff_y / norm;
@@ -133,7 +175,7 @@ float adjustment = 0.05f * fabs(distanceError) * difficulty;
             {
                 // Slow enemy that rotates toward the player.
                 float desiredAngle = atan2f(diff_y, diff_x) * 180.0f / M_PI;
-                float rotationSpeed = 2.5f;  // Slower rotation than shooter.
+                float rotationSpeed = 5.0f;  // Slower rotation than shooter.
                 float angleDifference = desiredAngle - enemies[i].angle;
                 while (angleDifference > 180.0f) angleDifference -= 360.0f;
                 while (angleDifference < -180.0f) angleDifference += 360.0f;
@@ -239,7 +281,6 @@ float adjustment = 0.05f * fabs(distanceError) * difficulty;
             }
             case ENEMY_SPLITTER:
             {
-                // Splitting enemy: use basic rotational tracking.
                 float desiredAngle = atan2f(diff_y, diff_x) * 180.0f / M_PI;
                 float rotationSpeed = 5.0f;
                 float angleDifference = desiredAngle - enemies[i].angle;
@@ -254,7 +295,6 @@ float adjustment = 0.05f * fabs(distanceError) * difficulty;
                 float rad = enemies[i].angle * (M_PI / 180.0f);
                 enemies[i].x += cosf(rad) * moveStep;
                 enemies[i].y += sinf(rad) * moveStep;
-                // Note: When a splitter is hit (in collision detection), spawn two basic enemies.
                 break;
             }
             case ENEMY_STEALTH:
@@ -384,6 +424,24 @@ float adjustment = 0.05f * fabs(distanceError) * difficulty;
     }
 }
 
+static void filledRotatedEllipse(SDL_Renderer *renderer, int cx, int cy, int rx, int ry, float angle, Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
+    const int numSegments = 20; // Increase for a smoother ellipse.
+    Sint16 vx[numSegments], vy[numSegments];
+    float radAngle = angle * (M_PI / 180.0f);
+    for (int i = 0; i < numSegments; i++) {
+        // Get the vertex on the ellipse in local space.
+        float theta = (2.0f * M_PI * i) / numSegments;
+        float localX = rx * cosf(theta);
+        float localY = ry * sinf(theta);
+        // Rotate the vertex by enemy's angle.
+        float rotatedX = localX * cosf(radAngle) - localY * sinf(radAngle);
+        float rotatedY = localX * sinf(radAngle) + localY * cosf(radAngle);
+        vx[i] = cx + (int)rotatedX;
+        vy[i] = cy + (int)rotatedY;
+    }
+    filledPolygonRGBA(renderer, vx, vy, numSegments, r, g, b, a);
+}
+
 // Draw enemies with different shapes/colors based on type.
 void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float cam_y) {
     int drawn = 0;
@@ -398,7 +456,7 @@ void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float ca
 
         switch (enemies[i].type) {
             case ENEMY_BASIC:
-                filledEllipseRGBA(renderer, cx, cy, 15, 10, 255, 0, 0, 255);
+                filledRotatedEllipse(renderer, cx, cy, 15, 10, enemies[i].angle, 255, 0, 0, 255);
                 break;
             case ENEMY_SHOOTER: {
                 const float halfWidth = 12.0f;
@@ -421,16 +479,30 @@ void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float ca
                 break;
             }
             case ENEMY_TANK:
-                filledEllipseRGBA(renderer, cx, cy, 20, 14, 0, 0, 255, 255);
+                filledRotatedEllipse(renderer, cx, cy, 20, 14, enemies[i].angle, 0, 0, 255, 255);
                 break;
             case ENEMY_EVASIVE: {
-                Sint16 vx[3] = { cx, cx - 10, cx + 10 };
-                Sint16 vy[3] = { cy - 12, cy + 8, cy + 8 };
-                filledPolygonRGBA(renderer, vx, vy, 3, 0, 255, 0, 255);
+                const float halfWidth = 12.0f;
+                const float halfHeight = 8.0f;
+                float rad = enemies[i].angle * (M_PI / 180.0f);
+                // Define triangle in local space.
+                float local[3][2] = {
+                    { 0, -halfHeight },       // top
+                    { halfWidth, halfHeight },  // bottom right
+                    { -halfWidth, halfHeight }  // bottom left
+                };
+                Sint16 vx[3], vy[3];
+                for (int j = 0; j < 3; j++) {
+                    float rx = local[j][0] * cos(rad) - local[j][1] * sin(rad);
+                    float ry = local[j][0] * sin(rad) + local[j][1] * cos(rad);
+                    vx[j] = cx + (int)rx;
+                    vy[j] = cy + (int)ry;
+                }
+                filledPolygonRGBA(renderer, vx, vy, 3, 255, 165, 0, 255);
                 break;
             }
             case ENEMY_FAST:
-                filledEllipseRGBA(renderer, cx, cy, 10, 7, 255, 255, 0, 255);
+                filledRotatedEllipse(renderer, cx, cy, 10, 7, enemies[i].angle, 255, 255, 0, 255);
                 break;
             case ENEMY_SPLITTER:
                 filledCircleRGBA(renderer, cx, cy, 12, 128, 0, 128, 255);

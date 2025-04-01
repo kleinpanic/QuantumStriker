@@ -46,5 +46,6 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score);
 // Declaration for enemy_shoot, which fires a bullet from a shooter enemy toward the player.
 void enemy_shoot(Enemy *enemy, BulletPool *pool, float player_x, float player_y);
 
+void split_enemy(Enemy enemies[], int index); 
 #endif
 

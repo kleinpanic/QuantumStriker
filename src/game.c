@@ -547,7 +547,7 @@ void game_loop() {
                         float dx = bulletPool.bullets[i].x - enemies[j].x;
                         float dy = bulletPool.bullets[i].y - enemies[j].y;
                         float dist = sqrtf(dx * dx + dy * dy);
-                        if (dist < 15) {
+                        if (dist < COLLISIONTHRESHOLD) {
                             enemies[j].health -= bulletPool.bullets[i].damage;
                             DEBUG_PRINT(3, 2, "Player bullet hit enemy %d; new health = %d", j, enemies[j].health);
                             if (!(g_dev_auto_mode && AI_PIERCING_SHOT)) {
@@ -560,6 +560,9 @@ void game_loop() {
                                         explosions[k].y = enemies[j].y;
                                         explosions[k].radius = 5.0f;
                                         explosions[k].lifetime = 30; // lasts 30 frames
+                                        if (enemies[j].type == ENEMY_SPLITTER) {
+                                            split_enemy(enemies, j);
+                                        }
                                         break;
                                     }
                                 }

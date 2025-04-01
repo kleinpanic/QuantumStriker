@@ -11,6 +11,9 @@ extern int shakeTimer;
 extern float shakeMagnitude;
 extern volatile sig_atomic_t g_exit_requested;
 
+/* Game Configurations */
+#define COLLISIONTHRESHOLD 15
+
 /* Background configuratiosn */
 #define ENABLE_GRID 0  // 0: grid off, 1: grid on
 #ifndef WORLD_BORDER
