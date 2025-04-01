@@ -171,6 +171,9 @@ void dev_ai_control(Player *player, Enemy enemies[], BulletPool *bulletPool, int
         if (dist < SHIELD_DISTANCE) {
             activate_shield(player, 1);
             DEBUG_PRINT(1, 3, "Shield activated (target distance %.2f < %.2f)", dist, SHIELD_DISTANCE);
+            float tip_x, tip_y;
+            get_ship_tip(player, &tip_x, &tip_y);
+            shoot_bullet(bulletPool, tip_x, tip_y, player->angle, 0);
         } else {
             activate_shield(player, 0);
             DEBUG_PRINT(1, 3, "Shield deactivated (target distance %.2f >= %.2f)", dist, SHIELD_DISTANCE);
@@ -230,6 +233,9 @@ void dev_ai_control(Player *player, Enemy enemies[], BulletPool *bulletPool, int
             player->vx *= 0.8f;
             player->vy *= 0.8f;
             DEBUG_PRINT(1, 3, "Offense: enemy within shooting range, braking to stabilize");
+            float tip_x, tip_y;
+            get_ship_tip(player, &tip_x, &tip_y);
+            shoot_bullet(bulletPool, tip_x, tip_y, player->angle, 0);
         }
     
         if (fabs(angle_adjust) < 5.0f && distance <= SHOOTING_RANGE) {

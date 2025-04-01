@@ -48,9 +48,16 @@ extern volatile sig_atomic_t g_exit_requested;
 
 /* Enemy Configurations */
 #define MAX_ENEMIES 50
+#define COLLISION_MARGIN 5.0f
 
 /* Highscores flag configuration */
 #define HIGHSCORE_FLAG_MAX_ENTRY_NUMBER 10
+#define MAX_BLOCKS 1000  // Maximum number of blocks to read from the blockchain file
+
+/* Random */
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #endif /* CONFIG_H */
 

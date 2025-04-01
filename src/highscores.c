@@ -6,8 +6,6 @@
 #include "blockchain.h"   // For ScoreBlock structure and HASH_STR_LEN.
 #include "signature.h"    // For verify_score_signature
 
-#define MAX_BLOCKS 1000  // Maximum number of blocks to read from the blockchain file
-
 // Helper function to strip "DevAI" suffix from a username, if present.
 static void strip_devai_suffix(char *username, size_t max_len) {
     (void)max_len; // suppressed warning; 

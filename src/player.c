@@ -5,10 +5,6 @@
 #include <SDL2/SDL2_gfxPrimitives.h>
 #include <math.h>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
 void init_player(Player *player, int screen_width, int screen_height) {
     (void)screen_width;
     (void)screen_height;

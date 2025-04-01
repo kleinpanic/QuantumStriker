@@ -65,7 +65,8 @@ int main(int argc, char *argv[]) {
             // Check if a Sub-argument is provided. 
             if (i + 1 >= argc) {
                 DEBUG_PRINT(0, 1, "Usage for --development:\n");
-                DEBUG_PRINT(0, 1, "     auto: Enables automatic playstyle for dev mode\n.");
+                DEBUG_PRINT(0, 1, "     auto: Enables automatic playstyle for dev mode\n");
+                DEBUG_PRINT(0, 1, "     testing: Calls Testing Options\n");
                 return 1;
             } else {
                 // a subargument has been provided! yay
@@ -73,17 +74,56 @@ int main(int argc, char *argv[]) {
                     g_dev_auto_mode = 1;
                     DEBUG_PRINT(0, 3, "Development mode activated w/ auto option");
                     i++; //skip the "auto" argument and continue
+                } else if (strcmp(argv[i+1], "testing") == 0) {
+                    g_testing_mode = 1;
+                    DEBUG_PRINT(0, 2, "Calling Testing Mode in src/main.c");
+                    //i++;
+                    if (i + 2 >= argc) {
+                        DEBUG_PRINT(0, 1, "Usage for Testing Option:\n");
+                        return 1;
+                    } else { 
+                        if (strcmp(argv[i+2], "enemy") == 0) {
+                            DEBUG_PRINT(0, 2, "Calling Enemy Testing Option");
+                            //i++;
+                            if (i + 3 >= argc) {
+                                DEBUG_PRINT(0, 1, "Usage for Enemy flag:\n");
+                                return 1;
+                            } else {
+                                DEBUG_PRINT(0, 3, "Successfully called Enemy flag w/ Number\n");
+                                if (strcmp(argv[i+3], "1") == 0) {
+                                    DEBUG_PRINT(0, 2, "Spawning only default enemy\n");
+                                } else if (strcmp(argv[i+3], "2") == 0) {
+                                    DEBUG_PRINT(0, 2, "Spawning only shooter enemy\n");
+                                } else if (strcmp(argv[i+3], "3") == 0) {
+                                    DEBUG_PRINT(0, 2, "Spawning only tank enemy\n");
+                                } else if (strcmp(argv[i+3], "4") == 0) {
+                                    DEBUG_PRINT(0, 2, "Spawning only evasive enemy\n");
+                                } else if (strcmp(argv[i+3], "5") == 0) {
+                                    DEBUG_PRINT(0, 2, "Spawning only fast enemy\n");
+                                } else if (strcmp(argv[i+3], "6") == 0) {
+                                    DEBUG_PRINT(0, 2, "Spawning only splitter enemy\n");
+                                } else if (strcmp(argv[i+3], "7") == 0) {
+                                    DEBUG_PRINT(0, 2, "Spawning only stealth enemy\n");
+                                } else {
+                                    DEBUG_PRINT(0, 2, "Invalid Usage\n");
+                                    return 1;
+                                }
+                            }
+                        } else {
+                            DEBUG_PRINT(0, 1, "Invalid Testing Option\n");
+                            return 1;
+                        }
+                    }
                 } else {
                     // Invalide sub argument was passed. Print error
                     DEBUG_PRINT(0, 1, "Invalid Usage of --development:\n");
                     printf("unknown argument : '%s'\n", argv[i+1]);
                     DEBUG_PRINT(0, 1, "Usage for --development:\n");
-                    DEBUG_PRINT(0, 1, "     auto: Enables automatic playstyle for dev mode\n.");
+                    DEBUG_PRINT(0, 1, "     auto: Enables automatic playstyle for dev mode\n");
+                    DEBUG_PRINT(0, 1, "     testing: Calls testing options\n");
                     return 1;
                 }
             }
-        } else if (strcmp(argv[i], "--testing") == 0) {
-            g_testing_mode = 1;
         } else {
             printf("Unknown option: %s\nTry '--help' for usage.\n", argv[i]);
             return 1;
