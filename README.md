@@ -7,17 +7,10 @@
 ## Top Scores & Cheaters 
 
 <!-- TOP_SCORES_START -->
-<<<<<<< HEAD
-| Rank | Username        | Score | Timestamp           |
-|------|-----------------|-------|---------------------|
-| 1    | kleinpanicDevAI | 5267  | 2025-03-27 22:51:48 |
-| 2    | kleinpanic      | 2585  | 2025-03-26 12:02:08 |
-=======
 | Rank | Username           | Score | Timestamp |
 |------|--------------------|-------|-----------|
-| 1    | kleinpanicDevAI    | 10930 | 2025-03-28 06:28:49 |
+| 1    | kleinpanicDevAI    | 84700 | 2025-03-28 18:34:09 |
 | 2    | kleinpanic         | 2585  | 2025-03-26 16:02:08 |
->>>>>>> 73c618e9084ea162c52f9ebcb6c6671fe45e1ae9
 <!-- TOP_SCORES_END -->
 
 <!-- CHEATERS_START -->
@@ -248,7 +241,12 @@ The code is organized to separate concerns and allow independent development of 
   The `update_highscores.py` script (run by CI or manually) parses the blockchain:
   - It aggregates the highest **valid** score per username.
   - Sorts these scores and takes the top N (usually top 10).
-  - Overwrites the **Top Scores** table in this README (between `<!-- TOP_SCORES_START -->` and `<!-- TOP_SCORES_END -->`) with the latest rankings.
+  - Overwrites the **Top Scores** table in this README (between `<!-- TOP_SCORES_START -->
+| Rank | Username           | Score | Timestamp |
+|------|--------------------|-------|-----------|
+| 1    | kleinpanicDevAI    | 84700 | 2025-03-28 18:34:09 |
+| 2    | kleinpanic         | 2585  | 2025-03-26 16:02:08 |
+<!-- TOP_SCORES_END -->`) with the latest rankings.
   - If any invalid blocks were found, it lists the corresponding usernames and scores under the **Cheaters** section (between markers). Each cheater entry typically indicates an attempted forged score or a corrupted entry.
   - The script then commits the changes. On GitHub, the Action will push the updated README so that the public view is updated.
   
