@@ -479,54 +479,57 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score) {
             float distance = 150 + rand() % 150;  // 150 to 300 units away
             enemies[i].x = player_x + cosf(angle) * distance;
             enemies[i].y = player_y + sinf(angle) * distance;
-            int r = rand() % 100;
-            if (score < 100) {
-                enemies[i].type = ENEMY_BASIC;
-            } else if (score < 500) {
-                enemies[i].type = (r < 80) ? ENEMY_BASIC : ENEMY_SHOOTER;
-            } else if (score < 1000) {
-                if (r < 50)
+            if (g_forced_enemy_type != -1) {
+                enemies[i].type = g_forced_enemy_type;
+            } else {
+                int r = rand() % 100;
+                if (score < 100) {
                     enemies[i].type = ENEMY_BASIC;
-                else if (r < 75)
-                    enemies[i].type = ENEMY_SHOOTER;
-                else
-                    enemies[i].type = ENEMY_TANK;
-            } else if (score < 2000) {
-                if (r < 40)
-                    enemies[i].type = ENEMY_BASIC;
-                else if (r < 60)
-                    enemies[i].type = ENEMY_SHOOTER;
-                else if (r < 75)
-                    enemies[i].type = ENEMY_TANK;
-                else if (r < 85)
-                    enemies[i].type = ENEMY_FAST;
-                else if (r < 95)
-                    enemies[i].type = ENEMY_EVASIVE;
-                else
-                    enemies[i].type = ENEMY_SPLITTER;
-            } else { // score >= 2000
-                if (r < 30)
-                    enemies[i].type = ENEMY_BASIC;
-                else if (r < 40)
-                    enemies[i].type = ENEMY_SHOOTER;
-                else if (r < 50)
-                    enemies[i].type = ENEMY_TANK;
-                else if (r < 60)
-                    enemies[i].type = ENEMY_FAST;
-                else if (r < 70)
-                    enemies[i].type = ENEMY_EVASIVE;
-                else if (r < 75)
-                    enemies[i].type = ENEMY_SPLITTER;
-                else if (r < 80)
-                    enemies[i].type = ENEMY_STEALTH;
-                else if (r < 85)
-                    enemies[i].type = ENEMY_BOSS1;
-                else if (r < 90)
-                    enemies[i].type = ENEMY_BOSS2;
-                else
-                    enemies[i].type = ENEMY_BOSS3;
+                } else if (score < 500) {
+                    enemies[i].type = (r < 80) ? ENEMY_BASIC : ENEMY_SHOOTER;
+                } else if (score < 1000) {
+                    if (r < 50)
+                        enemies[i].type = ENEMY_BASIC;
+                    else if (r < 75)
+                        enemies[i].type = ENEMY_SHOOTER;
+                    else
+                        enemies[i].type = ENEMY_TANK;
+                } else if (score < 2000) {
+                    if (r < 40)
+                        enemies[i].type = ENEMY_BASIC;
+                    else if (r < 60)
+                        enemies[i].type = ENEMY_SHOOTER;
+                    else if (r < 75)
+                        enemies[i].type = ENEMY_TANK;
+                    else if (r < 85)
+                        enemies[i].type = ENEMY_FAST;
+                    else if (r < 95)
+                        enemies[i].type = ENEMY_EVASIVE;
+                    else
+                        enemies[i].type = ENEMY_SPLITTER;
+                } else { // score >= 2000
+                    if (r < 30)
+                        enemies[i].type = ENEMY_BASIC;
+                    else if (r < 40)
+                        enemies[i].type = ENEMY_SHOOTER;
+                    else if (r < 50)
+                        enemies[i].type = ENEMY_TANK;
+                    else if (r < 60)
+                        enemies[i].type = ENEMY_FAST;
+                    else if (r < 70)
+                        enemies[i].type = ENEMY_EVASIVE;
+                    else if (r < 75)
+                        enemies[i].type = ENEMY_SPLITTER;
+                    else if (r < 80)
+                        enemies[i].type = ENEMY_STEALTH;
+                    else if (r < 85)
+                        enemies[i].type = ENEMY_BOSS1;
+                    else if (r < 90)
+                        enemies[i].type = ENEMY_BOSS2;
+                    else
+                        enemies[i].type = ENEMY_BOSS3;
+                }
             }
-
             switch (enemies[i].type) {
                 case ENEMY_BASIC: enemies[i].health = 3; break;
                 case ENEMY_SHOOTER: enemies[i].health = 3; enemies[i].shootTimer = 120; break;

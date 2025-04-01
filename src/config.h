@@ -6,6 +6,7 @@
 extern int g_fullscreen;   // 0 = resizable, 1 = full screen
 extern int g_dev_auto_mode;
 extern int g_testing_mode;
+extern int g_forced_enemy_type;
 extern int shakeTimer;
 extern float shakeMagnitude;
 extern volatile sig_atomic_t g_exit_requested;

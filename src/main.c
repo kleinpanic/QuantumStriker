@@ -3,9 +3,11 @@
 #include "score.h"
 #include "debug.h"
 #include "config.h"
+#include "enemy.h"
 int g_fullscreen = 0;
 int g_testing_mode = 0;
 int g_dev_auto_mode = 0;
+int g_forced_enemy_type = -1; // -1 means "not set"
 
 #include <stdio.h>
 #include <string.h>
@@ -77,7 +79,6 @@ int main(int argc, char *argv[]) {
                 } else if (strcmp(argv[i+1], "testing") == 0) {
                     g_testing_mode = 1;
                     DEBUG_PRINT(0, 2, "Calling Testing Mode in src/main.c");
-                    //i++;
                     if (i + 2 >= argc) {
                         DEBUG_PRINT(0, 1, "Usage for Testing Option:\n");
                         return 1;
@@ -89,24 +90,39 @@ int main(int argc, char *argv[]) {
                                 DEBUG_PRINT(0, 1, "Usage for Enemy flag:\n");
                                 return 1;
                             } else {
-                                DEBUG_PRINT(0, 3, "Successfully called Enemy flag w/ Number\n");
-                                if (strcmp(argv[i+3], "1") == 0) {
-                                    DEBUG_PRINT(0, 2, "Spawning only default enemy\n");
-                                } else if (strcmp(argv[i+3], "2") == 0) {
-                                    DEBUG_PRINT(0, 2, "Spawning only shooter enemy\n");
-                                } else if (strcmp(argv[i+3], "3") == 0) {
-                                    DEBUG_PRINT(0, 2, "Spawning only tank enemy\n");
-                                } else if (strcmp(argv[i+3], "4") == 0) {
-                                    DEBUG_PRINT(0, 2, "Spawning only evasive enemy\n");
-                                } else if (strcmp(argv[i+3], "5") == 0) {
-                                    DEBUG_PRINT(0, 2, "Spawning only fast enemy\n");
-                                } else if (strcmp(argv[i+3], "6") == 0) {
-                                    DEBUG_PRINT(0, 2, "Spawning only splitter enemy\n");
-                                } else if (strcmp(argv[i+3], "7") == 0) {
-                                    DEBUG_PRINT(0, 2, "Spawning only stealth enemy\n");
-                                } else {
-                                    DEBUG_PRINT(0, 2, "Invalid Usage\n");
-                                    return 1;
+                                int forced = atoi(argv[i+3]);
+                                switch (forced) {
+                                    case 1:
+                                        g_forced_enemy_type = ENEMY_BASIC;
+                                        DEBUG_PRINT(0, 2, "Spawning only default enemy");
+                                        break;
+                                    case 2: 
+                                        g_forced_enemy_type = ENEMY_SHOOTER;
+                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        break;
+                                    case 3:
+                                        g_forced_enemy_type = ENEMY_TANK;
+                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        break;
+                                    case 4:
+                                        g_forced_enemy_type = ENEMY_EVASIVE;
+                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        break;
+                                    case 5:
+                                        g_forced_enemy_type = ENEMY_FAST;
+                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        break;
+                                    case 6:
+                                        g_forced_enemy_type = ENEMY_SPLITTER;
+                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        break;
+                                    case 7:
+                                        g_forced_enemy_type = ENEMY_STEALTH;
+                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        break;
+                                    default:
+                                        DEBUG_PRINT(0, 1, "Invalid Usage\n");
+                                        return 1;
                                 }
                             }
                         } else {
@@ -114,6 +130,7 @@ int main(int argc, char *argv[]) {
                             return 1;
                         }
                     }
+                    i += 3; // skip the subarguments: "testing" "enemy" and the enemy number.
                 } else {
                     // Invalide sub argument was passed. Print error
                     DEBUG_PRINT(0, 1, "Invalid Usage of --development:\n");
