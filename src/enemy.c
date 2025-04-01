@@ -15,6 +15,7 @@ static float get_collision_radius(EnemyType type) {
         case ENEMY_FAST:      return 10.0f;
         case ENEMY_SPLITTER:  return 12.0f;
         case ENEMY_STEALTH:   return 15.0f;
+        case ENEMY_SHIELD:    return 15.0f;
         case ENEMY_BOSS1:     return 30.0f;
         case ENEMY_BOSS2:     return 28.0f;
         case ENEMY_BOSS3:     return 32.0f;
@@ -94,6 +95,7 @@ void init_enemies(Enemy enemies[]) {
         enemies[i].shootTimer = 0;
         enemies[i].visible = 1;
         enemies[i].type = ENEMY_BASIC;  // default type
+        enemies[i].shieldActive = 0;
         // Initialize angle so that by default it faces right (0° means to the right)
         enemies[i].angle = 0.0f;
     }
@@ -101,7 +103,7 @@ void init_enemies(Enemy enemies[]) {
 }
 
 // Update enemies with different behaviors based on type.
-void update_enemies(Enemy enemies[], float player_x, float player_y, float difficulty, BulletPool* pool) {
+void update_enemies(Enemy enemies[], float player_x, float player_y, float player_angle, float difficulty, BulletPool* pool) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!enemies[i].active)
             continue;
@@ -264,7 +266,7 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
             {
                 // Fast enemy: similar to basic but with rotation and increased speed.
                 float desiredAngle = atan2f(diff_y, diff_x) * 180.0f / M_PI;
-                float rotationSpeed = 5.0f;
+                float rotationSpeed = 7.0f;
                 float angleDifference = desiredAngle - enemies[i].angle;
                 while (angleDifference > 180.0f) angleDifference -= 360.0f;
                 while (angleDifference < -180.0f) angleDifference += 360.0f;
@@ -273,7 +275,7 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
                 else
                     enemies[i].angle += (angleDifference > 0 ? rotationSpeed : -rotationSpeed);
     
-                moveStep = 0.8f * difficulty;
+                moveStep = 1.5f * difficulty;
                 float rad = enemies[i].angle * (M_PI / 180.0f);
                 enemies[i].x += cosf(rad) * moveStep;
                 enemies[i].y += sinf(rad) * moveStep;
@@ -299,58 +301,92 @@ void update_enemies(Enemy enemies[], float player_x, float player_y, float diffi
             }
             case ENEMY_STEALTH:
             {
-                // Toggle visibility based on distance.
-                if (distance < 100.0f || distance > 300.0f)
-                    enemies[i].visible = 1;
-                else
-                    enemies[i].visible = 0;
-    
-                float baseAngle = atan2f(diff_y, diff_x) * 180.0f / M_PI;
-                float desiredAngle;
+                // Determine distance from the enemy to the player.
+                float distance = sqrtf(diff_x * diff_x + diff_y * diff_y);
+                
+                // Set visibility:
+                // Become invisible when at a moderate range, but visible when too close (<75) or too far (>300).
                 if (distance >= 100.0f && distance <= 300.0f)
-                    desiredAngle = baseAngle + 30.0f;  // offset for sneaking
+                    enemies[i].visible = 0;
                 else
-                    desiredAngle = baseAngle;
-    
-                // Bullet avoidance.
-                float repulsion_x = 0.0f, repulsion_y = 0.0f;
-                for (int b = 0; b < pool->count; b++) {
-                    if (pool->bullets[b].active && pool->bullets[b].isEnemy == 0) {
-                        float bx = pool->bullets[b].x - enemies[i].x;
-                        float by = pool->bullets[b].y - enemies[i].y;
-                        float bdist = sqrtf(bx * bx + by * by);
-                        if (bdist < 50.0f) {
-                            repulsion_x -= bx / (bdist + 0.001f);
-                            repulsion_y -= by / (bdist + 0.001f);
-                        }
-                    }
+                    enemies[i].visible = 1;
+                    
+                // Compute the "behind" target.
+                // The player’s facing angle is in player->angle.
+                float behindAngle = player_angle + 180.0f; // Directly behind.
+                // You may add a small random offset here if desired.
+                float offsetDistance = 50.0f; // Desired distance behind the player.
+                float targetX = player_x + offsetDistance * cosf(behindAngle * (M_PI / 180.0f));
+                float targetY = player_y + offsetDistance * sinf(behindAngle * (M_PI / 180.0f));
+                
+                // Blend the "behind" target with the player’s position,
+                // so the enemy still approaches the player.
+                float weightBehind = 0.7f;
+                float weightPlayer = 0.3f;
+                float desiredX = weightBehind * targetX + weightPlayer * player_x;
+                float desiredY = weightBehind * targetY + weightPlayer * player_y;
+                
+                // Compute vector from enemy to desired target.
+                float vecX = desiredX - enemies[i].x;
+                float vecY = desiredY - enemies[i].y;
+                float vecNorm = sqrtf(vecX * vecX + vecY * vecY);
+                if (vecNorm > 0) {
+                    vecX /= vecNorm;
+                    vecY /= vecNorm;
                 }
-    
-                float sneak_x = cosf(desiredAngle * (M_PI / 180.0f));
-                float sneak_y = sinf(desiredAngle * (M_PI / 180.0f));
-                float final_x = sneak_x + repulsion_x;
-                float final_y = sneak_y + repulsion_y;
-                float final_norm = sqrtf(final_x * final_x + final_y * final_y);
-                if (final_norm > 0) {
-                    final_x /= final_norm;
-                    final_y /= final_norm;
-                }
-    
-                float targetAngle = atan2f(final_y, final_x) * 180.0f / M_PI;
-                float rotationSpeed = 5.0f;
-                float angleDifference = targetAngle - enemies[i].angle;
-                while (angleDifference > 180.0f) angleDifference -= 360.0f;
-                while (angleDifference < -180.0f) angleDifference += 360.0f;
-                if (fabs(angleDifference) < rotationSpeed)
-                    enemies[i].angle = targetAngle;
-                else
-                    enemies[i].angle += (angleDifference > 0 ? rotationSpeed : -rotationSpeed);
-    
-                moveStep = 0.4f * difficulty;
-                enemies[i].x += final_x * moveStep;
-                enemies[i].y += final_y * moveStep;
+                
+                // Determine the desired angle based on the vector.
+                float desiredAngle = atan2f(vecY, vecX) * 180.0f / M_PI;
+                
+                // Smoothly rotate enemy toward the desired angle.
+                rotate_toward(&enemies[i].angle, desiredAngle, 5.0f);
+                
+                // Move enemy in the direction it's now facing.
+                float moveStep = 0.4f * difficulty;
+                float rad = enemies[i].angle * (M_PI / 180.0f);
+                enemies[i].x += cosf(rad) * moveStep;
+                enemies[i].y += sinf(rad) * moveStep;
                 break;
             }
+            case ENEMY_SHIELD:
+                // Determine distance from enemy to player.
+                // Here we decide that if the enemy is between 75 and 300 units away,
+                // its shield is active (making it harder to hit), otherwise it deactivates.
+                if (distance >= 150.0f && distance <= 300.0f)
+                    enemies[i].shieldActive = 1;
+                else
+                    enemies[i].shieldActive = 0;
+                
+                // Compute the "behind" target. We want this enemy to try to get behind the player.
+                float behindAngle = player_angle + 180.0f; // Directly behind the player.
+                float offsetDistance = 50.0f; // Desired offset behind the player.
+                float targetX = player_x + offsetDistance * cosf(behindAngle * (M_PI / 180.0f));
+                float targetY = player_y + offsetDistance * sinf(behindAngle * (M_PI / 180.0f));
+                
+                // Blend the "behind" target with the player's actual position.
+                float weightBehind = 0.7f;
+                float weightPlayer = 0.3f;
+                float desiredX = weightBehind * targetX + weightPlayer * player_x;
+                float desiredY = weightBehind * targetY + weightPlayer * player_y;
+                
+                // Compute the vector from enemy to the desired target.
+                float vecX = desiredX - enemies[i].x;
+                float vecY = desiredY - enemies[i].y;
+                float vecNorm = sqrtf(vecX * vecX + vecY * vecY);
+                if (vecNorm > 0) {
+                    vecX /= vecNorm;
+                    vecY /= vecNorm;
+                }
+                // Determine the desired angle from the enemy’s position.
+                float desiredAngle = atan2f(vecY, vecX) * 180.0f / M_PI;
+                rotate_toward(&enemies[i].angle, desiredAngle, 5.0f);
+                
+                // Move the enemy in the direction it's now facing.
+                float moveStep = 0.4f * difficulty;
+                float rad = enemies[i].angle * (M_PI / 180.0f);
+                enemies[i].x += cosf(rad) * moveStep;
+                enemies[i].y += sinf(rad) * moveStep;
+                break;
             case ENEMY_BOSS1:
             {
                 moveStep = 0.4f * difficulty;
@@ -511,6 +547,12 @@ void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float ca
             case ENEMY_STEALTH:
                 filledEllipseRGBA(renderer, cx, cy, 15, 10, 192, 192, 192, 255);
                 break;
+            case ENEMY_SHIELD:
+                filledRotatedEllipse(renderer, cx, cy, 10, 15, enemies[i].angle, 200, 200, 192, 255);
+                if (enemies[i].shieldActive) {
+                    circleRGBA(renderer, cx, cy, 20, 0, 0, 255, 255);
+                }
+                break;
             case ENEMY_BOSS1:
                 filledEllipseRGBA(renderer, cx, cy, 30, 20, 255, 0, 255, 255);
                 break;
@@ -581,12 +623,15 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score) {
                         enemies[i].type = ENEMY_SPLITTER;
                     else if (r < 80)
                         enemies[i].type = ENEMY_STEALTH;
+                    else if (r < 81)
+                        enemies[i].type = ENEMY_SHIELD;
                     else if (r < 85)
                         enemies[i].type = ENEMY_BOSS1;
                     else if (r < 90)
                         enemies[i].type = ENEMY_BOSS2;
-                    else
+                    else 
                         enemies[i].type = ENEMY_BOSS3;
+                    
                 }
             }
             switch (enemies[i].type) {
@@ -597,6 +642,7 @@ void spawn_enemy(Enemy enemies[], float player_x, float player_y, int score) {
                 case ENEMY_FAST: enemies[i].health = 2; break;
                 case ENEMY_SPLITTER: enemies[i].health = 3; break;
                 case ENEMY_STEALTH: enemies[i].health = 3; break;
+                case ENEMY_SHIELD: enemies[i].health = 3; break;
                 case ENEMY_BOSS1: enemies[i].health = 25; break;
                 case ENEMY_BOSS2: enemies[i].health = 50; break;
                 case ENEMY_BOSS3: enemies[i].health = 75; break;

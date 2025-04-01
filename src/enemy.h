@@ -15,6 +15,7 @@ typedef enum {
     ENEMY_FAST,
     ENEMY_SPLITTER,
     ENEMY_STEALTH,
+    ENEMY_SHIELD,
     ENEMY_BOSS1,
     ENEMY_BOSS2,
     ENEMY_BOSS3
@@ -28,6 +29,7 @@ typedef struct {
     int timer;       // general-purpose timer for AI state changes
     int shootTimer;  // for shooter enemy (frames until next shot)
     int visible;     // for stealth enemy (1: visible, 0: invisible)
+    int shieldActive;
     float angle; // field for the enemy to rotate
 } Enemy;
 
@@ -35,7 +37,7 @@ typedef struct {
 void init_enemies(Enemy enemies[]);
 
 // Updates enemy behavior based on player position and difficulty.
-void update_enemies(Enemy enemies[], float player_x, float player_y, float difficulty, BulletPool* pool);
+void update_enemies(Enemy enemies[], float player_x, float player_y, float player_angle, float difficulty, BulletPool* pool);
 
 // Draws enemies with different visual styles based on their type.
 void draw_enemies(Enemy enemies[], SDL_Renderer* renderer, float cam_x, float cam_y);

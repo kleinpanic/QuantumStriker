@@ -120,6 +120,10 @@ int main(int argc, char *argv[]) {
                                         g_forced_enemy_type = ENEMY_STEALTH;
                                         DEBUG_PRINT(0, 2, "Spawning only stealth enemy");
                                         break;
+                                    case 8:
+                                        g_forced_enemy_type = ENEMY_SHIELD;
+                                        DEBUG_PRINT(0, 2, "Spawning only shield enemy");
+                                        break;
                                     default:
                                         DEBUG_PRINT(0, 1, "Invalid Usage\n");
                                         return 1;

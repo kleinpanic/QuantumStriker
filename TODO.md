@@ -45,7 +45,12 @@
 ## Enhanced Enemy AI
 
 - [X] Implement multiple enemy types with unique behaviors (e.g., enemies that shoot back, faster enemies).
-- [ ] Enhance Enemy AI
+- [X] Enhance Enemy AI
+- [X] Add sheild AI
+- [ ] Enhance the Boss AIs
+- [ ] Write a better scoring / spawning algortith
+- [ ] Add difficulty options
+- [ ] Add different gamemodes.
 - [X] Handle Inter Enemy Collisions
 - [ ] Improve inter enemy collisions for when there is a lot of enemies. 
 - [ ] Scale enemy difficulty further as the score increases (including health, speed, and spawn frequency).

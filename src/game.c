@@ -97,6 +97,11 @@ void dev_ai_control(Player *player, Enemy enemies[], BulletPool *bulletPool, int
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!enemies[i].active)
             continue;
+
+        // Skip stealth enemies that are invisible
+        if (enemies[i].type == ENEMY_STEALTH && !enemies[i].visible)
+            continue;
+
         float dx = enemies[i].x - player->x;
         float dy = enemies[i].y - player->y;
         float distance = sqrtf(dx * dx + dy * dy);
@@ -537,7 +542,7 @@ void game_loop() {
         }
         
         float diffScale = 1.0f + (((score > 5000 ? 5000 : score) / 1000.0f)) * (g_dev_auto_mode ? AI_PROGRESS_MULTIPLIER : 1.0f);
-        update_enemies(enemies, player.x, player.y, diffScale, &bulletPool);
+        update_enemies(enemies, player.x, player.y, player.angle, diffScale, &bulletPool);
         
         // Process collisions between player's bullets and enemies.
         for (int i = 0; i < bulletPool.count; i++) {
@@ -548,10 +553,17 @@ void game_loop() {
                         float dy = bulletPool.bullets[i].y - enemies[j].y;
                         float dist = sqrtf(dx * dx + dy * dy);
                         if (dist < COLLISIONTHRESHOLD) {
-                            enemies[j].health -= bulletPool.bullets[i].damage;
-                            DEBUG_PRINT(3, 2, "Player bullet hit enemy %d; new health = %d", j, enemies[j].health);
                             if (!(g_dev_auto_mode && AI_PIERCING_SHOT)) {
                                 bulletPool.bullets[i].active = 0;
+                            }
+                            //enemies[j].health -= bulletPool.bullets[i].damage;
+                            //DEBUG_PRINT(3, 2, "Player bullet hit enemy %d; new health = %d", j, enemies[j].health);
+                            if (enemies[j].type == ENEMY_SHIELD && enemies[j].shieldActive) {
+                                DEBUG_PRINT(3, 2, "Shielded enemy %d hit: no damage taken.", j);
+                                bulletPool.bullets[i].active = 0;
+                            } else {
+                                enemies[j].health -= bulletPool.bullets[i].damage;
+                                DEBUG_PRINT(3, 2, "Player bullet hit enemy %d; new health = %d", j, enemies[j].health);
                             }
                             if (enemies[j].health <= 0) {
                                 for (int k = 0; k < MAX_EXPLOSIONS; k++) {
