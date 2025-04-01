@@ -30,6 +30,20 @@ void enemy_shoot(Enemy *enemy, BulletPool *pool, float player_x, float player_y)
     DEBUG_PRINT(3, 2, "Enemy SHOOTER fired bullet towards player at angle %.2f", angle);
 }
 
+static void rotate_toward(float *current, float target, float maxDelta) {
+    float diff = target - *current;
+    while (diff > 180.0f) diff -= 360.0f;
+    while (diff < -180.0f) diff += 360.0f;
+    if (fabs(diff) <= maxDelta) {
+        *current = target;
+    } else {
+        *current += (diff > 0 ? maxDelta : -maxDelta);
+    }
+    // Ensure the angle stays in [0,360)
+    while (*current < 0) *current += 360.0f;
+    while (*current >= 360.0f) *current -= 360.0f;
+}
+
 // Initialize all enemies and their additional fields.
 void init_enemies(Enemy enemies[]) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -140,95 +154,68 @@ float adjustment = 0.05f * fabs(distanceError) * difficulty;
             }
             case ENEMY_EVASIVE:
             {
-                DEBUG_PRINT(0, 2, "Spawned Evasive");
-                const float bullet_danger_distance = 50.0f;
-                const float bullet_repulsion_factor = 3.0f;
+                DEBUG_PRINT(3, 2, "Spawned Evasive");
+                // Parameters for behavior
+                const float attractionWeight = 2.0f;
+                const float repulsionWeight = 5.0f;
+                const float bulletDangerDistance = 60.0f;
+                const float secondaryBulletDangerDistance = 120.0f;
+                const float maxRotDelta = 7.0f; // Maximum Rotation per frame in degrees.
+                const float moveSpeed = 0.8f * difficulty;
                 // Base attraction toward the player.
-                float att_x = diff_x / (distance > 0 ? distance : 1);
-                float att_y = diff_y / (distance > 0 ? distance : 1);
+                float norm = (distance > 0) ? distance : 1.0f;
+                float att_x = (diff_x / norm) * attractionWeight;
+                float att_y = (diff_y / norm) * attractionWeight;
     
                 // Bullet avoidance: scan for nearby player bullets.
-                float repulsion_x = 0.0f, repulsion_y = 0.0f;
-                int playerBulletTooClose = 0;
-                for (int i = 0; i < pool->count; i++) {
-                    if (pool->bullets[i].active && pool->bullets[i].isEnemy == 0) {
-                        float bx = pool->bullets[i].x - enemies[i].x;
-                        float by = pool->bullets[i].y - enemies[i].y;
+                float rep_x = 0.0f, rep_y = 0.0f;
+                int critical = 0;
+                for (int j = 0; j < pool->count; j++) {
+                    if (pool->bullets[j].active && pool->bullets[j].isEnemy == 0) {
+                        float bx = pool->bullets[j].x - enemies[i].x;
+                        float by = pool->bullets[j].y - enemies[i].y;
                         float bdist = sqrtf(bx * bx + by * by);
-                        DEBUG_PRINT(0, 2, "player Bullet %d: bdist=%.2f", i, bdist);
-                        if (bdist < bullet_danger_distance) {
-                            playerBulletTooClose = 1;
-                            repulsion_x -= bx / bdist * (bullet_danger_distance - bdist) * bullet_repulsion_factor;
-                            repulsion_y -= by / bdist * (bullet_danger_distance - bdist) * bullet_repulsion_factor;
-                            DEBUG_PRINT(0, 2, "Player Bullet %d: Repulsive added (%.2f, %.2f)", i, repulsion_x, repulsion_y);
+                        DEBUG_PRINT(1, 2, "player Bullet %d: bdist=%.2f", j, bdist);
+                        if (bdist < bulletDangerDistance) {
+                            critical = 1;
+                            float force = repulsionWeight * (bulletDangerDistance - bdist) / bulletDangerDistance;
+                            rep_x -= (bx / bdist) * force;
+                            rep_y -= (by / bdist) * force;
+                        } else if (bdist < secondaryBulletDangerDistance) {
+                            float force = (repulsionWeight / 2.0f) * (secondaryBulletDangerDistance - bdist) / secondaryBulletDangerDistance;
+                            rep_x -= (bx / bdist) * force;
+                            rep_y -= (by / bdist) * force;
+                            DEBUG_PRINT(1, 2, "Player Bullet %d: Repulsive added (%.2f, %.2f)", i, rep_x, rep_y);
                         }
                     }
                 }
-                // Combine attraction and repulsion.
-                float final_x = att_x + repulsion_x;
-                float final_y = att_y + repulsion_y;
+
+                float final_x, final_y;
+                if (critical) {
+                    final_x = rep_x;
+                    final_y = rep_y;
+                    float randomOffset = ((rand() % 200) - 100) / 100.0f; // In range -1 to 1
+                    final_x += randomOffset;
+                    final_y += randomOffset;
+                } else {
+                    final_x = att_x + rep_x;
+                    final_y = att_y + rep_y;
+                }
+
+
                 float final_norm = sqrtf(final_x * final_x + final_y * final_y);
                 if (final_norm > 0) {
                     final_x /= final_norm;
                     final_y /= final_norm;
                 }
 
-                if (playerBulletTooClose) {
-                    DEBUG_PRINT(0, 2, "Player bullets are dangerously close");
-                    float flee_angle = atan2f(repulsion_y, repulsion_x) * (180.0f / M_PI) + 90.0f;
-                    float angle_adjust = flee_angle - enemies[i].angle;
-                    while (angle_adjust > 180.0f) angle_adjust -= 360.0f;
-                    while (angle_adjust < -180.0f) angle_adjust += 360.0f;
-                    DEBUG_PRINT(0, 2, "Bullet Evasion: flee_angle=%.2f, angle_adjust=%.2f", flee_angle, angle_adjust);
-                    if (fabs(angle_adjust) < 5.0f)
-                        enemies[i].angle = flee_angle;
-                    else if (angle_adjust > 0)
-                        enemies[i].angle += 5.0f;
-                    else
-                        enemies[i].angle -= 5.0f;
-                    DEBUG_PRINT(0, 3, "Bullet Evasion: new angle=%.2f", enemies[i].angle);
-                    moveStep = 0.8f * difficulty;
-                    enemies[i].x -= final_x * moveStep;
-                    enemies[i].y -= final_y * moveStep;
-                    return; // Do not continue offensive behavior while bullets are too close.
-                }
-
-                // Evasion from player repulsion (if any remains after bullet evasion).
-                if (fabs(repulsion_x) > 0.01f || fabs(repulsion_y) > 0.01f) {
-                    float flee_angle = atan2f(repulsion_y, repulsion_x) * (180.0f / M_PI) + 90.0f;
-                    float angle_adjust = flee_angle - enemies[i].angle;
-                    while (angle_adjust > 180.0f) angle_adjust -= 360.0f;
-                    while (angle_adjust < -180.0f) angle_adjust += 360.0f;
-                    DEBUG_PRINT(1, 2, "Evasion (player): flee_angle=%.2f, angle_adjust=%.2f", flee_angle, angle_adjust);
-                    if (fabs(angle_adjust) < 5.0f)
-                        enemies[i].angle = flee_angle;
-                    else if (angle_adjust > 0)
-                        enemies[i].angle += 5.0f;
-                    else
-                        enemies[i].angle -= 5.0f;
-                    DEBUG_PRINT(1, 3, "Evasion (enemies): new angle=%.2f", enemies[i].angle);
-                    moveStep = 0.8f * difficulty;
-                    enemies[i].x -= final_x * moveStep;
-                    enemies[i].y -= final_y * moveStep;
-                    DEBUG_PRINT(1, 3, "Evasion (enemies): applying reverse thrust");
-                    return; // Evasion takes precedence.
-                }
-                    
                 // Determine desired angle from the resulting vector.
                 float desiredAngle = atan2f(final_y, final_x) * 180.0f / M_PI;
-                float rotationSpeed = 5.0f;
-                float angleDifference = desiredAngle - enemies[i].angle;
-                while (angleDifference > 180.0f) angleDifference -= 360.0f;
-                while (angleDifference < -180.0f) angleDifference += 360.0f;
-                if (fabs(angleDifference) < rotationSpeed)
-                    enemies[i].angle = desiredAngle;
-                else
-                    enemies[i].angle += (angleDifference > 0 ? rotationSpeed : -rotationSpeed);
-    
+                rotate_toward(&enemies[i].angle, desiredAngle, maxRotDelta);
                 // Move slightly faster than basic enemy.
-                moveStep = 0.6f * difficulty;
-                enemies[i].x += final_x * moveStep;
-                enemies[i].y += final_y * moveStep;
+                float rad = enemies[i].angle * (M_PI / 180.0f);
+                enemies[i].x += cosf(rad) * moveSpeed;
+                enemies[i].y += sinf(rad) * moveSpeed;
                 break;
             }
             case ENEMY_FAST:

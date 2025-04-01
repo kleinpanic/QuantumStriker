@@ -102,23 +102,23 @@ int main(int argc, char *argv[]) {
                                         break;
                                     case 3:
                                         g_forced_enemy_type = ENEMY_TANK;
-                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        DEBUG_PRINT(0, 2, "Spawning only tank enemy");
                                         break;
                                     case 4:
                                         g_forced_enemy_type = ENEMY_EVASIVE;
-                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        DEBUG_PRINT(0, 2, "Spawning only evasive enemy");
                                         break;
                                     case 5:
                                         g_forced_enemy_type = ENEMY_FAST;
-                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        DEBUG_PRINT(0, 2, "Spawning only fast enemy");
                                         break;
                                     case 6:
                                         g_forced_enemy_type = ENEMY_SPLITTER;
-                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        DEBUG_PRINT(0, 2, "Spawning only splitter enemy");
                                         break;
                                     case 7:
                                         g_forced_enemy_type = ENEMY_STEALTH;
-                                        DEBUG_PRINT(0, 2, "Spawning only shooter enemy");
+                                        DEBUG_PRINT(0, 2, "Spawning only stealth enemy");
                                         break;
                                     default:
                                         DEBUG_PRINT(0, 1, "Invalid Usage\n");
