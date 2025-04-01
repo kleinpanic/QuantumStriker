@@ -7,10 +7,17 @@
 ## Top Scores & Cheaters 
 
 <!-- TOP_SCORES_START -->
+<<<<<<< HEAD
 | Rank | Username        | Score | Timestamp           |
 |------|-----------------|-------|---------------------|
 | 1    | kleinpanicDevAI | 5267  | 2025-03-27 22:51:48 |
 | 2    | kleinpanic      | 2585  | 2025-03-26 12:02:08 |
+=======
+| Rank | Username           | Score | Timestamp |
+|------|--------------------|-------|-----------|
+| 1    | kleinpanicDevAI    | 10930 | 2025-03-28 06:28:49 |
+| 2    | kleinpanic         | 2585  | 2025-03-26 16:02:08 |
+>>>>>>> 73c618e9084ea162c52f9ebcb6c6671fe45e1ae9
 <!-- TOP_SCORES_END -->
 
 <!-- CHEATERS_START -->
